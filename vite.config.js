@@ -56,7 +56,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/,
+            urlPattern: /^https:\/\/.*\.supabase\.co\/(?!auth\/).*/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api',
