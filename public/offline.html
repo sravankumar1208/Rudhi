@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#C0152A">
+  <title>Rudhi – Offline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #FAF8F6;
+      color: #1C1C1E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      max-width: 360px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .icon { width: 80px; height: 80px; }
+    h1 { font-size: 24px; font-weight: 800; color: #1C1C1E; }
+    p { font-size: 14px; color: #6B7280; line-height: 1.6; }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      border: 1px solid #F3F4F6;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      text-align: left;
+    }
+    .card h2 { font-size: 13px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .card ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .card ul li { font-size: 14px; color: #1C1C1E; display: flex; align-items: center; gap: 8px; }
+    .card ul li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #1A9E5C; flex-shrink: 0; }
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid #E8A020; border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .badge {
+      background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 12px;
+      padding: 14px; display: flex; align-items: flex-start; gap: 10px; text-align: left;
+    }
+    .badge p { font-size: 12px; color: #1C1C1E; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#C0152A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
+    </svg>
+    <h1>You're Offline</h1>
+    <p>Don't worry — Rudhi works offline too. Your data will sync when you're back online.</p>
+
+    <div class="card">
+      <h2>Available Offline</h2>
+      <ul>
+        <li>View your donation history</li>
+        <li>Check donor certificate</li>
+        <li>View saved hospital info</li>
+        <li>Read FAQs</li>
+      </ul>
+    </div>
+
+    <div class="badge">
+      <div class="spinner"></div>
+      <p>Auto-reconnecting... Your data will be synced once the connection is restored.</p>
+    </div>
+
+    <button onclick="window.location.reload()" style="
+      background: transparent; border: 2px solid #C0152A; color: #C0152A;
+      font-size: 16px; font-weight: 600; padding: 14px 32px; border-radius: 12px;
+      cursor: pointer; font-family: inherit; width: 100%;
+    ">Try Again</button>
+  </div>
+</body>
+</html>

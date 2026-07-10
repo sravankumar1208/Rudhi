@@ -1,0 +1,2709 @@
+# Rudhi – Blood Bridge: Implementation Plan
+
+***
+
+## Implementation Plan Overview
+
+| Phase | Title | Type | Focus Area |
+| ----- | ----- | ---- | ---------- |
+| 1 | Project Foundation & Design System | Front-End | Vite/React setup, PWA config, design tokens, routing, layouts |
+| 2 | Core Screens – Onboarding, Auth & Profile | Front-End | Onboarding carousel, auth UI, profile setup screens |
+| 3 | Donor & Requester Screens | Front-End | Home dashboard, create request, donor alert, navigation, tracking |
+| 4 | Supporting Screens & Admin UI | Front-End | History, certificates, notifications, hospitals, settings, admin |
+| 5 | Authentication Implementation | Auth | Supabase Auth – Phone OTP, Google OAuth, session management |
+| 6 | Database, Real-Time & Core Backend | Back-End | Supabase schema, RLS, Realtime, Edge Functions, matching algorithm |
+| 7 | Third-Party Integrations | Back-End | Twilio SMS, FCM push, Maps APIs, OpenAI GPT-4o, Resend email |
+| 8 | PWA Completion & Offline Mode | Back-End | Service worker, offline fallback, background sync, install prompt |
+| 9 | Review, Refactor & Verification | Review | Security audit, performance, accessibility, PRD compliance check |
+
+***
+
+## Phase 1: Project Foundation & Design System
+
+### Objective
+
+Establish the complete project scaffold with Vite + React 18, configure the PWA infrastructure, implement the Tailwind-based design system with all custom tokens, set up global routing, persistent layouts, and the bottom navigation bar.
+
+***
+
+### Task 1.1 – Project Initialization
+
+**Step 1:** Scaffold the project using Vite with the React template:
+
+```
+npm create vite@latest rudhi -- --template react
+cd rudhi
+npm install
+```
+
+**Step 2:** Install all required front-end dependencies in one pass:
+
+```
+npm install react-router-dom zustand react-hook-form zod @hookform/resolvers
+npm install leaflet react-leaflet
+npm install @supabase/supabase-js
+npm install lucide-react
+npm install jotai
+npm install framer-motion
+npm install react-hot-toast
+npm install @radix-ui/react-dialog @radix-ui/react-tabs @radix-ui/react-switch @radix-ui/react-select @radix-ui/react-accordion
+npm install clsx tailwind-merge
+```
+
+**Step 3:** Install Tailwind CSS and PWA plugin:
+
+```
+npm install -D tailwindcss postcss autoprefixer vite-plugin-pwa workbox-window
+npx tailwindcss init -p
+```
+
+**Step 4:** Configure `vite.config.js` to include the PWA plugin with basic manifest and Workbox settings:
+
+* Set `registerType: 'autoUpdate'`
+* Define `manifest` with `name: "Rudhi – Blood Bridge"`, `short_name: "Rudhi"`, `theme_color: "#C0152A"`, `background_color: "#FAF8F6"`, `display: "standalone"`, `start_url: "/home"`
+* Include icon entries for 192×192 and 512×512
+* Configure `workbox.runtimeCaching` with:
+    * Cache-first strategy for static assets (`/assets/**`)
+    * Network-first strategy for Supabase API calls
+    * Stale-while-revalidate for map tiles
+
+**Step 5:** Create `public/manifest.json` with all required PWA fields, icon paths, and screenshots array for install eligibility.
+
+***
+
+### Task 1.2 – Tailwind Design System Configuration
+
+**Step 1:** Extend `tailwind.config.js` with custom design tokens matching the PRD color palette:
+
+```js
+theme: {
+  extend: {
+    colors: {
+      primary: {
+        DEFAULT: '#C0152A',
+        light: '#F9E5E8',
+      },
+      secondary: '#FAF8F6',
+      accent: '#E8A020',
+      success: '#1A9E5C',
+      danger: '#EF4444',
+      neutral: {
+        dark: '#1C1C1E',
+        mid: '#6B7280',
+        light: '#F3F4F6',
+      },
+      dark: {
+        bg: '#0D1B2A',
+      }
+    },
+    fontFamily: {
+      heading: ['Plus Jakarta Sans', 'sans-serif'],
+      body: ['Inter', 'sans-serif'],
+      mono: ['JetBrains Mono', 'monospace'],
+    },
+    fontSize: {
+      base: ['16px', '1.5'],
+      sm: ['14px', '1.5'],
+      h1: ['40px', '1.2'],
+      h2: ['32px', '1.25'],
+      h3: ['24px', '1.3'],
+    },
+    animation: {
+      pulse: 'pulse 1.5s ease-in-out infinite',
+      'slide-up': 'slideUp 0.3s ease-out',
+      'fade-in': 'fadeIn 0.2s ease-in',
+    }
+  }
+}
+```
+
+**Step 2:** Add Google Fonts import for Plus Jakarta Sans, Inter, and JetBrains Mono in `index.html`:
+
+```html
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+```
+
+**Step 3:** Create `src/styles/globals.css` with:
+
+* Tailwind directives (`@tailwind base/components/utilities`)
+* Custom CSS variables for the color palette (enables dark mode theming)
+* Blood drop pulse animation keyframes
+* Slide-up modal animation keyframes
+* Custom scrollbar styles
+* Touch target enforcement: `min-height: 44px; min-width: 44px` on interactive elements
+
+**Step 4:** Create `src/lib/utils.js` with the `cn()` utility combining `clsx` and `tailwind-merge` for conditional class management.
+
+***
+
+### Task 1.3 – Reusable Component Library
+
+**Step 1:** Create `src/components/ui/` directory with the following base components:
+
+**Button.jsx:**
+
+* Variants: `primary` (crimson red, full-width option), `secondary` (outline), `ghost`, `danger`
+* Sizes: `sm`, `md`, `lg`
+* Loading state with spinner
+* Accessible: `aria-label`, `disabled` state styling
+* Minimum touch target 44×44px enforced via padding
+
+**Input.jsx:**
+
+* Label, input field, error message layout
+* Focus ring in primary color
+* Inline error display with red border on validation failure
+* Support for prefix icons (phone flag, search icon)
+
+**Card.jsx:**
+
+* Base card with shadow, rounded corners, white background
+* `urgencyBorder` prop: accepts `critical` (red left border), `moderate` (amber), `routine` (green)
+* `interactive` prop: adds hover/press states
+
+**Badge.jsx:**
+
+* Blood group badges with specific color: O- (red), O+ (orange), A+/A- (blue), B+/B- (purple), AB+/AB- (teal)
+* Status badges: Active, Searching, Completed, Cancelled, On Cooldown
+
+**BloodDropIcon.jsx:**
+
+* Custom SVG blood drop component
+* Props: `size`, `color`, `animated` (pulse animation)
+* Used as status indicators throughout the app
+
+**Modal.jsx / BottomSheet.jsx:**
+
+* Radix UI Dialog wrapper
+* Slide-up animation for bottom sheet variant
+* Backdrop blur, close button, accessibility focus trap
+
+**LoadingSpinner.jsx:**
+
+* Animated spinner with optional overlay mode
+* Size variants
+
+**Step 2:** Create `src/components/ui/index.js` to barrel-export all UI components.
+
+***
+
+### Task 1.4 – Application Routing Setup
+
+**Step 1:** Create `src/router/index.jsx` using React Router v6 with `createBrowserRouter`:
+
+Define all routes based on the PRD navigation hierarchy:
+
+```
+/onboarding
+/auth
+/profile-setup
+/home
+/create-request
+/request-tracking/:id
+/donor-alert/:requestId
+/donor-navigation/:requestId
+/log-donation/:requestId
+/donation-history
+/donation-certificate/:donationId
+/notifications
+/hospitals
+/hospital/:id
+/profile
+/availability-settings
+/my-requests
+/settings
+/faq
+/about
+/admin
+/offline
+```
+
+**Step 2:** Create `src/layouts/AppLayout.jsx`:
+
+* Renders the persistent **Bottom Navigation Bar**
+* Conditionally renders top header bar for inner screens
+* Wraps `<Outlet />` for nested routes
+* Bottom nav tabs: Home (`/home`), Hospitals (`/hospitals`), Request (`/create-request`), Alerts (`/notifications`), Profile (`/profile`)
+* Center Request tab styled as elevated FAB in crimson red
+* Active tab detection using `useLocation()` → fills icon, applies primary red color
+* Unread notification count badge on Alerts tab (from Zustand store)
+
+**Step 3:** Create `src/layouts/AuthLayout.jsx`:
+
+* Minimal layout for `/onboarding`, `/auth`, `/profile-setup`
+* No bottom nav, full-screen usage
+
+**Step 4:** Create `src/components/navigation/BottomNavBar.jsx`:
+
+* 5-tab sticky bar fixed to viewport bottom
+* Safe area inset handling (`padding-bottom: env(safe-area-inset-bottom)`)
+* Icons from Lucide React
+* Tab press animation using Framer Motion
+
+**Step 5:** Create `src/components/navigation/TopHeader.jsx`:
+
+* Back arrow button (left) → `navigate(-1)`
+* Screen title (center, bold Plus Jakarta Sans)
+* Contextual right action slot (share icon, settings icon, etc.)
+* Conditionally displayed based on route
+
+**Step 6:** Set up `src/store/` directory with Zustand stores:
+
+* `authStore.js`: user session, role, profile data
+* `requestStore.js`: active blood requests, tracking state
+* `notificationStore.js`: unread count, notification list
+* `uiStore.js`: dark mode, offline status, modal states
+
+***
+
+### Task 1.5 – Environment & Project Structure
+
+**Step 1:** Create `.env.local` with all required environment variable placeholders:
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_GOOGLE_MAPS_API_KEY=
+VITE_OPENAI_API_KEY=
+VITE_FCM_VAPID_KEY=
+VITE_TWILIO_PHONE_NUMBER=
+VITE_EMERGENCY_SMS_NUMBER=
+```
+
+**Step 2:** Create `src/lib/supabase.js` — initialize Supabase client with URL and anon key from env variables.
+
+**Step 3:** Establish the full folder structure:
+
+```
+src/
+├── assets/          # SVG icons, illustrations, logo
+├── components/
+│   ├── ui/          # Base component library
+│   ├── navigation/  # BottomNavBar, TopHeader
+│   ├── maps/        # MapPicker, LiveMap, RouteMap components
+│   ├── forms/       # Reusable form sections
+│   └── shared/      # RequestCard, DonorCard, NotificationItem
+├── layouts/         # AppLayout, AuthLayout
+├── pages/           # One file per route/screen
+├── store/           # Zustand stores
+├── hooks/           # Custom React hooks
+├── lib/             # Supabase client, utils, validators
+├── router/          # Route definitions
+└── styles/          # globals.css
+```
+
+**Step 4:** Create `src/assets/` with placeholder SVGs: Rudhi logo, blood drop icon, onboarding illustrations (3 slides), empty state illustrations, offline illustration.
+
+***
+
+### Deliverables – Phase 1
+
+* Fully configured Vite + React 18 project with PWA plugin
+* Complete Tailwind design system with all color tokens, typography, and animations
+* Reusable UI component library (Button, Card, Badge, Input, Modal, BloodDropIcon)
+* React Router setup with all 20+ routes defined
+* AppLayout with functional BottomNavBar and TopHeader
+* Zustand store structure initialized
+* Environment configuration template
+* Project folder architecture established
+
+***
+
+## Phase 2: Core Screens – Onboarding, Auth & Profile
+
+### Objective
+
+Build all screens related to the user entry flow: the animated onboarding carousel, the authentication screen with all form variants, and the multi-step profile setup screen — with full UI implementation, form validation, and navigation wiring.
+
+***
+
+### Task 2.1 – Splash / Onboarding Screen (`/onboarding`)
+
+**Step 1:** Create `src/pages/Onboarding.jsx`.
+
+**Step 2:** Implement the 3-slide carousel:
+
+* Use a state variable `currentSlide` (0, 1, 2)
+* Each slide contains: full-width illustration (SVG), bold heading, subtitle text
+    * Slide 1: "Find Donors in Minutes" – map ping illustration
+    * Slide 2: "Real-Time Tracking" – donor en route illustration
+    * Slide 3: "Even Offline, We Alert" – SMS mode illustration
+* Swipe gesture support using Framer Motion `drag` with `dragConstraints`
+* Dot progress indicators below carousel (filled dot = active slide)
+
+**Step 3:** Add the Rudhi logo at the top with a `BloodDropIcon` component — animated pulse effect using `framer-motion` `animate` with scale oscillation.
+
+**Step 4:** Add app tagline: *"Every drop counts. Every second matters."* in Inter font, slate gray, centered.
+
+**Step 5:** Add navigation buttons:
+
+* "Skip" button (top-right, ghost style) → triggers `completeOnboarding()` immediately
+* "Next" button (primary red, full-width) — advances slides; on last slide changes to "Get Started"
+* "Get Started" → calls `completeOnboarding()` which sets `localStorage.setItem('onboardingComplete', 'true')` and navigates to `/auth`
+
+**Step 6:** In `src/router/index.jsx`, add a loader for `/onboarding` that checks `localStorage` — if `onboardingComplete` exists, redirect to `/auth`.
+
+***
+
+### Task 2.2 – Authentication Screen (`/auth`)
+
+**Step 1:** Create `src/pages/Auth.jsx`.
+
+**Step 2:** Render Rudhi compact logo header centered at top.
+
+**Step 3:** Implement toggle tabs using Radix UI Tabs — "Sign In" and "Sign Up" — styled with active underline in primary red.
+
+**Step 4:** Build the **Sign In Form** using React Hook Form + Zod:
+
+* **Phone Number Input:** Country code selector (dropdown with flag + dial code) + phone number field
+    * Validation: required, valid phone number format (Zod `.regex()`)
+* **"Send OTP" button** (primary red, full-width) → triggers Supabase `signInWithOtp`
+* **OTP Input field:** Appears conditionally after OTP is sent; 6-digit individual box inputs styled in monospace (JetBrains Mono)
+    * Auto-advance focus on each digit input
+    * "Resend OTP" link with 30-second countdown timer
+* **OR Divider** between phone and OAuth sections
+* **"Continue with Google" button** with Google logo SVG, bordered ghost style
+
+**Step 5:** Build the **Sign Up Form** using React Hook Form + Zod:
+
+* Full Name input (required, min 2 chars)
+* Phone number input (same as sign in)
+* **Role selector:** Three card options — Donor (blood drop icon), Patient/Requester (heart icon), Hospital Staff (hospital icon) — tap to select, selected card gets crimson red border
+* **Blood Group dropdown** (Radix Select): A+, A-, B+, B-, AB+, AB-, O+, O- — with visual badge preview
+* City / Location input with "Auto-detect" button (triggers `navigator.geolocation.getCurrentPosition`)
+* Google OAuth button
+* Terms & Privacy checkbox with link
+* "Create Account" primary button
+
+**Step 6:** Form validation error messages render inline below each field with danger red color and error icon.
+
+**Step 7:** Add loading state on all submit buttons — spinner replaces text during API calls.
+
+**Step 8:** Handle success navigation:
+
+* Sign in success → check if profile complete → `/home` or `/profile-setup`
+* Sign up success → `/profile-setup`
+
+***
+
+### Task 2.3 – Profile Setup Screen (`/profile-setup`)
+
+**Step 1:** Create `src/pages/ProfileSetup.jsx`.
+
+**Step 2:** Add a progress bar at the top — two steps, visually showing current step as filled crimson segment. Steps labeled "Personal Info" and "Location & Availability".
+
+**Step 3:** **Step 1 – Personal Info:**
+
+* Profile photo upload: circular avatar with camera icon overlay
+    * Clicking opens file picker; selected image previewed in avatar circle
+    * Image stored in Supabase Storage (wired in Phase 6)
+* Full Name (pre-filled from auth session, editable)
+* Date of Birth date picker (HTML `<input type="date">`, styled with Tailwind)
+* Gender selector: Male / Female / Non-binary / Prefer not to say (radio card buttons)
+* Blood Group (pre-filled from signup, editable dropdown)
+* Phone number (pre-filled, `readOnly`, styled as disabled)
+* Emergency contact name + phone (two inputs, optional but labeled as "Strongly Recommended")
+* "Next →" button → advances to Step 2
+
+**Step 4:** **Step 2 – Location & Availability (conditional: shown for Donor role):**
+
+* Create `src/components/maps/MapPicker.jsx`:
+    * Renders Leaflet map at `height: 240px` with a draggable marker centered at detected/default location
+    * On marker drag-end, reverse-geocodes coordinates using Nominatim API (free OpenStreetMap) and populates address field
+    * "Use My Current Location" button triggers `navigator.geolocation` → moves marker to detected coords
+* Address text input (auto-filled from geocoding, manually editable)
+* Availability status toggle (Radix UI Switch): Available / Unavailable
+* Preferred notification method: three toggle chips — App / SMS / Both
+* Ailments/Conditions disclosure: optional checkboxes (Diabetes, Heart Condition, Recent Surgery, On Medication, None of the above)
+
+**Step 5:** For Patient/Requester role on Step 2, show a simpler form:
+
+* Associated hospital name (optional text input)
+* City/location input only (no map picker required)
+
+**Step 6:** For Hospital Staff role on Step 2:
+
+* Hospital name input (required)
+* Hospital address input
+* Staff ID / role description
+
+**Step 7:** "Save & Continue" button → saves profile to Supabase `profiles` table → navigates to `/home`.
+
+**Step 8:** "Skip for Now" secondary button → navigates directly to `/home` (profile marked as incomplete in store).
+
+***
+
+### Deliverables – Phase 2
+
+* Fully functional `/onboarding` with animated 3-slide carousel and localStorage skip logic
+* Complete `/auth` screen with Sign In (Phone OTP UI + Google OAuth button) and Sign Up form with role selection
+* Multi-step `/profile-setup` with map picker, photo upload UI, and role-conditional steps
+* All forms validated with React Hook Form + Zod
+* Navigation wiring between all three screens completed
+
+***
+
+## Phase 3: Donor & Requester Core Screens
+
+### Objective
+
+Build the primary functional screens used during live blood request events: the role-adaptive home dashboard, blood request creation form with AI assistant UI, real-time request tracking map for requesters, the urgent donor alert screen, donor navigation screen, and the donation logging screen.
+
+***
+
+### Task 3.1 – Home / Dashboard Screen (`/home`)
+
+**Step 1:** Create `src/pages/Home.jsx`.
+
+**Step 2:** Build the **Header** component for home:
+
+* Left: Rudhi logo (SVG, small)
+* Right: Notification bell icon (Lucide) with a red badge count bubble showing unread count from `notificationStore`; user avatar (circular) → navigates to `/profile`
+
+**Step 3:** Implement **Role-Adaptive Hero Section** using `authStore` role:
+
+*For Donor:*
+
+* Large pill toggle switch: "Available" (green) / "Unavailable" (gray) — tapping updates Supabase `profiles.availability_status`
+* If on cooldown: display cooldown countdown card showing "Next eligible donation in X days" with a circular progress ring
+* Stat card: "You've saved X lives" with heart + number in large bold type
+
+*For Patient/Requester:*
+
+* Large red "Request Blood Now" CTA button (full width, 56px height, crimson red)
+* If an active request exists: display status card with blood group, hospital, status badge, and "View" link
+
+*For Hospital Staff:*
+
+* "Post Blood Request" button
+* Quick stats row: Active Requests (number), Donors in Range (number)
+
+**Step 4:** Build the **Active Requests Feed** (visible to Donors):
+
+* Create `src/components/shared/RequestCard.jsx`:
+    * Left urgency border color (red = critical, amber = moderate, green = routine)
+    * Blood group badge (large, colored)
+    * Hospital name (bold), Distance (slate gray), Time posted ("3 mins ago")
+    * Urgency label chip ("CRITICAL" / "MODERATE" / "ROUTINE")
+    * Units needed indicator
+    * "Accept" button (green, sm) and "View Details" link (ghost)
+* Render scrollable list of RequestCards from Supabase Realtime subscription (wired in Phase 6)
+* Empty state: "No matching requests in your area" with illustration
+
+**Step 5:** Build **Recent Activity Section**:
+
+* Shows last 3 donation entries (for donors) or last 3 requests (for requesters)
+* Small card format: date, hospital, blood group, status
+
+**Step 6:** Build **Quick Stats Bar**:
+
+* Horizontal row of 3 stat pills: "X Donors Nearby", "Y Active Requests", "Z My Donations"
+* Stats fetched from Supabase (wired in Phase 6); show skeleton loaders during fetch
+
+**Step 7:** Build **Community Banner**:
+
+* Dismissible card at bottom of screen
+* Shows admin broadcast message (from Supabase, wired in Phase 6)
+* Dismiss stores dismissal in localStorage
+
+**Step 8:** Implement skeleton loading states for all data-driven sections using pulsing gray placeholder blocks while data loads.
+
+***
+
+### Task 3.2 – Create Blood Request Screen (`/create-request`)
+
+**Step 1:** Create `src/pages/CreateRequest.jsx`.
+
+**Step 2:** Add top header with back arrow and title "Request Blood".
+
+**Step 3:** Build **AI Assistant Toggle section**:
+
+* "Fill with AI ✨" button (amber accent color, with sparkle icon)
+* When toggled: render a chat bubble UI below the button
+    * Text area: "Describe your blood need in plain English..."
+    * Send button → calls OpenAI GPT-4o API (wired in Phase 7) with the text
+    * Response auto-populates form fields below
+    * Loading state: animated typing dots in chat bubble
+    * AI-filled fields get a small "✨ AI filled" indicator label
+
+**Step 4:** Build the **Manual Form** using React Hook Form + Zod:
+
+*Blood Group Selector:*
+
+* Visual 2×4 grid of 8 blood group option cards (A+, A-, B+, B-, AB+, AB-, O+, O-)
+* Each card: large blood type text, small colored background
+* Selected card: crimson red border + checkmark overlay
+
+*Units Needed:*
+
+* Stepper input with – and + buttons, value display (1–10), number input
+* Minimum 1, maximum 10 validation
+
+*Urgency Level Selector:*
+
+* Three visual card options: "Critical 🔴", "Moderate 🟡", "Routine 🟢"
+* Each card shows urgency icon, label, description ("Needed within 1 hour" / "Within 6 hours" / "Planned")
+* Selected card highlighted with corresponding border color
+
+*Hospital Name:*
+
+* Text input with autocomplete dropdown (searches Supabase hospitals table)
+* Shows matching hospital names as dropdown options; selecting prefills Hospital Location
+
+*Hospital Location:*
+
+* Mini Leaflet map (200px height) with a draggable marker
+* Search bar above map (Nominatim geocoding API)
+* "Use device location" button
+
+*Patient Name (optional):* Text input (labeled "For Hospital Staff")
+
+*Additional Notes:* Textarea, 200 character counter
+
+*Contact Phone:* Pre-filled from profile, editable
+
+**Step 5:** Build **Donor Radius Selector**:
+
+* Horizontal slider with 4 snap points: 5km / 10km / 25km / 50km
+* Below slider: "X donors available within Y km for blood group Z" — real-time count updates as blood group/radius changes (Supabase query on change)
+
+**Step 6:** Add **Enable SMS Emergency Mode** toggle (Radix Switch):
+
+* Label explains: "Sends SMS alerts to donors without internet"
+* Requires Twilio to be configured (check environment)
+
+**Step 7:** "Send Alert to Donors" submit button:
+
+* Full width, crimson red, 56px height
+* Triggers confirmation modal:
+    * Modal content: "Alerting X donors within Y km for blood group Z. Proceed?"
+    * Two buttons: "Confirm" (red) and "Cancel" (ghost)
+    * On confirm: submits form to Supabase, navigates to `/request-tracking/:id`
+
+**Step 8:** Form validation: all required fields highlighted in red if empty on submit attempt.
+
+***
+
+### Task 3.3 – Request Tracking Screen (`/request-tracking/:id`)
+
+**Step 1:** Create `src/pages/RequestTracking.jsx`.
+
+**Step 2:** Build **Status Header**:
+
+* Request ID displayed in JetBrains Mono
+* Status badge with icon and color: Searching (amber, pulsing), Donor Found (blue), En Route (blue, animated), Completed (green), Cancelled (gray)
+* Blood group badge, units count, hospital name — row below ID
+
+**Step 3:** Build the **Live Map View** using `src/components/maps/LiveMap.jsx`:
+
+* Full-width Leaflet map (height: 55% of viewport)
+* Hospital pin: red cross marker icon (custom SVG)
+* Donor pin: animated blood drop marker (updates position every 15 seconds via Supabase Realtime)
+* Route polyline between donor pin and hospital pin (calculated via OSRM routing API or Google Maps Directions — wired in Phase 7)
+* ETA label rendered as a Leaflet tooltip on the route line
+
+**Step 4:** Build **Donor Info Card** (conditionally visible when donor has accepted):
+
+* White card with shadow, slides up from bottom
+* Donor avatar thumbnail, donor name (bold), blood group badge
+* ETA countdown timer (large, monospace numbers, counting down in real time)
+* Distance remaining text
+* "Call Donor" button (phone icon, opens `tel:` link)
+
+**Step 5:** Build **Pinged Donors Panel** (collapsible accordion):
+
+* Collapsed by default, "See all pinged donors (X)" toggle
+* List items: donor initials avatar, "Donor #X" (anonymized), status chip (Pending / Accepted / Declined)
+
+**Step 6:** Build **Request Actions** section:
+
+* "Close Request" button (ghost, danger color) — confirmation modal before closing
+* "Expand Radius" button (amber, outline) — appears after 5 minutes of no acceptance; tapping expands radius by next tier and re-pings new donors
+
+**Step 7:** "Share Request" button (top-right header action):
+
+* Uses `navigator.share()` (Web Share API) to share a link
+* Fallback: copy link to clipboard with toast confirmation
+
+***
+
+### Task 3.4 – Donor Alert Screen (`/donor-alert/:requestId`)
+
+**Step 1:** Create `src/pages/DonorAlert.jsx`.
+
+**Step 2:** Implement **full-screen urgent overlay**:
+
+* Background: linear gradient from `#C0152A` to `#8B0000`
+* Animated blood drop icon (pulse scale animation via Framer Motion)
+* "URGENT BLOOD REQUEST" header in white, bold Plus Jakarta Sans, 28px
+
+**Step 3:** Render request details in high-contrast white text:
+
+* Blood group (large display, 48px, white)
+* Units required text
+* Urgency level chip
+* Hospital name + distance (e.g., "Apollo Hospital — 8.4 km away")
+* Time posted ("2 minutes ago" with clock icon)
+
+**Step 4:** Build **Mini Map Preview**:
+
+* Compact Leaflet map (150px height, non-interactive/static)
+* Shows hospital location and donor's approximate location
+* ETA estimate label ("\~19 min to hospital")
+
+**Step 5:** Build the **Three Action Buttons** at bottom:
+
+* "✅ Accept – I'll Donate" — large, success green, full width → calls acceptance handler → navigates to `/donor-navigation/:requestId`
+* "⏰ Remind Me in 10 Min" — medium, amber/outline → sets a 10-minute browser notification reminder, navigates to `/home`
+* "❌ Decline" — ghost/outline, white border → shows decline reason dropdown (Not available / Health condition / Too far / Other), then navigates to `/home`
+
+**Step 6:** Handle notification-triggered entry: if user arrives via push notification tap, extract `requestId` from notification payload and load request details from Supabase.
+
+***
+
+### Task 3.5 – Donor Navigation Screen (`/donor-navigation/:requestId`)
+
+**Step 1:** Create `src/pages/DonorNavigation.jsx`.
+
+**Step 2:** Build **Full-Screen Navigation Map** using `src/components/maps/RouteMap.jsx`:
+
+* Full-viewport Leaflet map
+* Donor's real-time location: blue GPS dot (updates every 10 seconds via `navigator.geolocation.watchPosition`)
+* Hospital pin: red cross icon
+* Route polyline (static, fetched on load from routing API)
+* Distance remaining label (updates as GPS position changes)
+* ETA label (updates based on current position)
+
+**Step 3:** Build **Top Info Bar** (semi-transparent overlay on map top):
+
+* Hospital name (bold white text)
+* Distance remaining (large number + "km")
+* ETA (countdown)
+
+**Step 4:** Build **Turn-by-Turn Direction Bottom Sheet** (persistent, draggable up/down):
+
+* Next turn instruction (e.g., "Turn right onto MG Road in 200m")
+* Street/direction icon (arrow icon from Lucide)
+* Scrollable list of remaining turns (collapsed below)
+
+**Step 5:** Build **Navigation Action Buttons** (above bottom sheet):
+
+* "Open in Google Maps" → deep link: `https://maps.google.com/maps?daddr={lat},{lng}`
+* "Open in Waze" → deep link: `waze://?ll={lat},{lng}&navigate=yes`
+* Detect platform (Android/iOS) and show appropriate app options
+
+**Step 6:** Build **"I've Arrived" button**:
+
+* Sticky button at very bottom, crimson red, large
+* Tap → confirmation modal: "Confirm arrival at [Hospital Name]?"
+* On confirm: updates Supabase request status, stops GPS tracking, navigates to `/log-donation/:requestId`
+
+**Step 7:** Build **Patient Contact Info Card** (collapsible):
+
+* Requester's phone number (masked: shows last 4 digits unless expanded)
+* "Call" button opens `tel:` link
+
+**Step 8:** **Panic/Cancel button** (top-right header menu, `⋮` icon):
+
+* Dropdown: "Cancel – Can No Longer Donate"
+* Confirmation modal: "Are you sure? The patient will be notified."
+* On confirm: updates Supabase, navigates to `/home`
+
+***
+
+### Task 3.6 – Log Donation Screen (`/log-donation/:requestId`)
+
+**Step 1:** Create `src/pages/LogDonation.jsx`.
+
+**Step 2:** Build **Confirmation Animation**:
+
+* Large animated checkmark with blood drop using Framer Motion (scale + opacity entrance)
+* Confetti/particle burst effect on mount (CSS keyframe animation)
+* "Thank You, [Donor Name]!" heading in Plus Jakarta Sans
+
+**Step 3:** Build **Donation Summary Card**:
+
+* Date & time (formatted: "Wednesday, June 12, 2025 at 3:45 PM")
+* Hospital name
+* Blood group donated (badge)
+* Units donated: stepper input (pre-filled from request, editable to confirm actual units)
+* Request ID (monospace)
+
+**Step 4:** Build **Feedback Section**:
+
+* Star rating (5 stars, tappable, fills in amber on selection)
+* Optional text feedback textarea (placeholder: "How was your experience?")
+
+**Step 5:** Build **Social Share Card** (toggleable via switch):
+
+* Preview card: "I just donated blood and helped save a life! #Rudhi #BloodDonation"
+* "Share" button → calls `navigator.share()` or copies to clipboard
+
+**Step 6:** Add **Certificate Preview Thumbnail**:
+
+* Blurred/watermarked certificate preview image
+* "View & Download Certificate →" link → navigates to `/donation-certificate/:donationId`
+
+**Step 7:** "View My Donation History" button (secondary) and "Back to Home" button (primary red).
+
+**Step 8:** On mount, trigger Supabase donation logging and cooldown activation (wired in Phase 6).
+
+***
+
+### Deliverables – Phase 3
+
+* Role-adaptive `/home` dashboard with active request feed, stats, and hero section
+* Complete `/create-request` form with AI assistant UI, map picker, radius selector, and confirmation modal
+* Real-time `/request-tracking/:id` with live map, donor info card, and request actions
+* Full-screen urgent `/donor-alert/:requestId` with acceptance/decline/snooze actions
+* GPS-tracking `/donor-navigation/:requestId` with route map, turn-by-turn UI, native maps deep links
+* `/log-donation/:requestId` with animation, donation confirmation, feedback, and certificate link
+
+***
+
+## Phase 4: Supporting Screens & Admin UI
+
+### Objective
+
+Build all remaining screens: donation history, certificates, notifications center, hospital directory, profile management, availability settings, settings, FAQ with AI chat, and the admin dashboard — completing 100% of the PRD's screen requirements.
+
+***
+
+### Task 4.1 – Donation History Screen (`/donation-history`)
+
+**Step 1:** Create `src/pages/DonationHistory.jsx`.
+
+**Step 2:** Build **Stats Summary Bar**:
+
+* 4 stat cards in a horizontal scrollable row:
+    * Total Donations (number + blood drop icon)
+    * Lives Potentially Impacted (number + heart icon)
+    * Donation Streak (X consecutive)
+    * Next Eligible Date (date or "Ready Now!" in green)
+* If on cooldown: replace "Next Eligible Date" with a progress bar showing days remaining / 56 days
+
+**Step 3:** Build **Filter Bar**:
+
+* Three tabs: "All" / "This Year" / "By Blood Group"
+* "By Blood Group" shows a blood group chip selector row below tabs
+
+**Step 4:** Build **Donation List** (scrollable):
+
+* Each item is a card with:
+    * Left border (success green for completed, amber for pending)
+    * Date (bold), Hospital name
+    * Blood group badge + units (e.g., "O- · 1 unit")
+    * Status chip: "Completed" (green) or "Pending Verification" (amber)
+    * "View Certificate" link (right-aligned, arrow icon)
+
+**Step 5:** Build **Cooldown Banner** (conditionally shown):
+
+* Amber background card: "You can donate again in X days"
+* Horizontal progress bar showing cooldown progress (filled based on days passed)
+
+**Step 6:** Build **Badges & Achievements Row**:
+
+* Horizontal scrollable row of badge cards
+* Each badge: icon (custom SVG blood drop variants), label ("First Drop", "5 Lives", "Regular Hero", "Lifesaver of the Month"), description tooltip
+* Locked badges: grayscale + lock icon overlay
+* Unlocked badges: full color with checkmark
+
+**Step 7:** Empty state: centered illustration + "Your donation journey starts here" text + "Find a Request" button → `/home`.
+
+***
+
+### Task 4.2 – Donation Certificate Screen (`/donation-certificate/:donationId`)
+
+**Step 1:** Create `src/pages/DonationCertificate.jsx`.
+
+**Step 2:** Build the **Certificate Design Component** (`src/components/shared/CertificateCard.jsx`):
+
+* Styled to resemble a formal certificate with decorative border (CSS)
+* Rudhi logo top-center
+* "Certificate of Blood Donation" heading
+* "This certifies that [Donor Name] donated [X] unit(s) of [BloodGroup] blood at [Hospital Name] on [Date]"
+* Certificate ID (JetBrains Mono, bottom)
+* Rudhi tagline at bottom
+
+**Step 3:** "Download as PDF" button:
+
+* Triggers Supabase Edge Function `generate-certificate` (wired in Phase 6)
+* Shows loading spinner during generation
+* On completion: triggers browser download of PDF blob
+
+**Step 4:** "Share" button:
+
+* Uses `navigator.share()` with PDF blob if supported
+* Fallback: copies shareable URL to clipboard
+
+***
+
+### Task 4.3 – Notifications Screen (`/notifications`)
+
+**Step 1:** Create `src/pages/Notifications.jsx`.
+
+**Step 2:** Build header with "Mark All Read" button (right side) — calls Supabase bulk update on click.
+
+**Step 3:** Build **Segmented Filter Tabs** (Radix Tabs): All / Requests / Alerts / System.
+
+**Step 4:** Build **Notification List** (date-grouped):
+
+* Group headers: "Today", "Yesterday", "Earlier"
+* Create `src/components/shared/NotificationItem.jsx`:
+    * Left icon (type-based): blood drop (request alert), checkmark (accepted), running person (en route), trophy (achievement), megaphone (system)
+    * Title (bold), body preview text (2 lines, truncated), timestamp (relative)
+    * Unread: left crimson dot indicator + slightly highlighted background
+    * Swipe-to-dismiss: Framer Motion `drag` on x-axis to reveal delete action
+* Tap: navigates to relevant screen based on notification type and linked entity ID
+
+**Step 5:** Settings shortcut: gear icon (top-right) → scrolls to `/settings#notifications`.
+
+**Step 6:** Empty state: "No notifications yet" with bell illustration.
+
+**Step 7:** On mount: mark all visible notifications as "seen" (not "read") in Supabase; "read" only on explicit "Mark All Read" tap.
+
+***
+
+### Task 4.4 – Hospital Directory Screen (`/hospitals`)
+
+**Step 1:** Create `src/pages/Hospitals.jsx`.
+
+**Step 2:** Build **Search Bar** at top (sticky):
+
+* Searches Supabase hospitals by name and city
+* Debounced input (300ms) before querying
+
+**Step 3:** Build **Filter row** below search:
+
+* City chip selector (scrollable horizontal chips)
+* "Blood Bank Available" toggle filter
+
+**Step 4:** Build **View Toggle** (List / Map):
+
+* Two icon buttons (list icon, map icon) at top-right
+
+**Step 5:** **List View:**
+
+* Scrollable list of `HospitalCard.jsx` components:
+    * Hospital name (bold), address (slate gray), distance from user
+    * Phone number with click-to-call
+    * Blood bank availability indicator (green dot = available, gray = unknown)
+    * Right arrow → navigates to `/hospital/:id`
+
+**Step 6:** **Map View:**
+
+* Full-screen Leaflet map
+* Custom hospital marker pins (red cross icon)
+* Tap on pin: shows popup card with hospital name, distance, "View Details" link
+* User's location shown as blue dot
+
+**Step 7:** Create `src/pages/HospitalDetail.jsx` (`/hospital/:id`):
+
+* Hospital name, full address, phone (click-to-call)
+* "Get Directions" button → deep links to Google Maps with hospital coordinates
+* Blood availability section (if data available from Supabase)
+* "Request Blood Here" button → navigates to `/create-request` with hospital pre-filled (pass state via React Router)
+* Recent (anonymized) requests at this hospital — last 3 entries
+
+***
+
+### Task 4.5 – Profile Screen (`/profile`)
+
+**Step 1:** Create `src/pages/Profile.jsx`.
+
+**Step 2:** Build **Profile Header**:
+
+* Profile photo (circular, 80px, tappable → opens image picker to update)
+* Name (bold, Plus Jakarta Sans, 20px), Blood group badge, City
+* Role label chip (Donor / Requester / Hospital Staff)
+* "Edit Profile" button → opens a bottom sheet modal with editable fields
+
+**Step 3:** Build **Donor Stats Section** (shown only for Donor role):
+
+* 2×2 grid of stat cards: Total Donations, Total Lives Impacted, Current Streak, Last Donation date
+* Cooldown progress bar (if on cooldown)
+
+**Step 4:** Build **Top 3 Badges Row**:
+
+* Horizontal display of 3 earned badge icons
+* "View All →" link → `/donation-history` (scrolls to badges section)
+
+**Step 5:** Build **Menu List** (vertical scrollable links):
+
+* Each item: icon, label, right arrow chevron
+* Items in order: My Donation History, My Blood Requests, Availability Settings, Emergency Contacts, Settings, Help & FAQ, About Rudhi, Logout
+* For Hospital Staff: show "Linked Hospital" menu item
+* Logout: confirmation modal ("Are you sure you want to logout?")
+
+**Step 6:** Build **Referral Section** at bottom:
+
+* Card with "Invite a Donor" heading, description, shareable referral code (monospace)
+* "Share Invite" button → `navigator.share()`
+
+***
+
+### Task 4.6 – Availability Settings Screen (`/availability-settings`)
+
+**Step 1:** Create `src/pages/AvailabilitySettings.jsx`.
+
+**Step 2:** Current availability status toggle at top:
+
+* Three-way selector: Available (green) / Unavailable (gray) / Traveling (amber)
+* Large, clear visual with current status highlighted
+
+**Step 3:** **Scheduled Availability section**:
+
+* 7-column grid (Mon–Sun), each column has 3 checkboxes: Morning / Afternoon / Evening
+* Renders as a responsive grid table
+* "Next Available" date picker (HTML date input) for donors currently unavailable
+
+**Step 4:** **Location Update section**:
+
+* Shows current registered location address
+* "Update My Location" button → opens map picker modal (reuse `MapPicker.jsx` from profile setup)
+
+**Step 5:** **Notification Preferences section**:
+
+* Toggle: "Receive blood request alerts" (Radix Switch)
+* Toggle: "SMS alerts" (requires confirmed phone — shows verification prompt if phone unverified)
+* Alert radius: 4-option button group (5km / 10km / 25km / 50km)
+* "Quiet Hours" section: "Do Not Disturb from [time] to [time]" — two time picker inputs
+
+**Step 6:** "Save Changes" button → updates Supabase `profiles` and `donor_availability` tables → shows success toast.
+
+***
+
+### Task 4.7 – My Requests Screen (`/my-requests`)
+
+**Step 1:** Create `src/pages/MyRequests.jsx`.
+
+**Step 2:** Header: "My Blood Requests" with request count badge.
+
+**Step 3:** Filter tabs: Active / Completed / Cancelled (Radix Tabs).
+
+**Step 4:** Request card list:
+
+* Each card: blood group badge, units, hospital name
+* Status badge, date posted, "Donors Pinged: X" count
+* For Active: "View Tracking" button → `/request-tracking/:id`
+* For Completed/Cancelled: "Repost" button → `/create-request` prefilled with previous data
+
+**Step 5:** Floating Action Button (crimson red, `+` icon, bottom-right): navigates to `/create-request`.
+
+***
+
+### Task 4.8 – FAQ / Help Screen (`/faq`)
+
+**Step 1:** Create `src/pages/FAQ.jsx`.
+
+**Step 2:** Build **AI Chat Widget** at top:
+
+* Chat bubble UI: Rudhi avatar (blood drop), user message on right, AI response on left
+* Input bar with send button
+* Connects to OpenAI GPT-4o API (wired in Phase 7)
+* Pre-seeded system prompt: "You are Rudhi's helpful assistant. Answer questions about blood donation, donor eligibility, the Rudhi app, and emergency procedures."
+* Loading: typing dots animation in Rudhi's response bubble
+
+**Step 3:** Build **FAQ Accordion** using Radix Accordion:
+
+* 5 sections: Donation Eligibility / How Requests Work / SMS Emergency Mode / Privacy & Data / Technical Help
+* Each section: collapsible with `+`/`-` icon toggle, smooth height animation
+* Pre-populate with common Q&A content
+
+**Step 4:** Contact Support button: opens email client (`mailto:`) or in-app support chat.
+
+**Step 5:** Video tutorial thumbnails (YouTube embed via `<iframe>` with `loading="lazy"`).
+
+***
+
+### Task 4.9 – Settings Screen (`/settings`)
+
+**Step 1:** Create `src/pages/Settings.jsx`.
+
+**Step 2:** Build structured settings list with section headers and Radix Switches/Selects:
+
+*Account Settings:*
+
+* Edit personal info → opens bottom sheet form
+* Change phone number → OTP re-verification flow UI
+* Delete account → multi-step confirmation modal (type "DELETE" to confirm) + data export trigger
+
+*Notification Settings (id: `notifications` for anchor linking):*
+
+* Toggles: Push notifications per type (blood requests, confirmations, reminders, system)
+* SMS notifications toggle
+* Email notifications toggle
+
+*Privacy Settings:*
+
+* Profile visibility: Public / Donors Only / Hidden (Radix RadioGroup)
+* Location sharing precision: Exact / Approximate (2-option selector)
+* Anonymous mode toggle for requesters
+
+*App Settings:*
+
+* Dark mode toggle → updates `uiStore.darkMode` → applies `dark` class to `<html>`
+* Language selector (Radix Select): English + 5 regional language options (placeholder for i18n)
+* Map provider: OpenStreetMap / Google Maps (2-option selector)
+* Offline SMS Emergency Mode: setup status + "Configure" link
+
+*Data & Storage:*
+
+* "Clear Cached Data" button → calls service worker cache clear
+* "Download My Data (GDPR)" button → triggers Supabase Edge Function to export user data as JSON
+
+*App info:* version number, build date, links to Privacy Policy and Terms
+
+***
+
+### Task 4.10 – Admin Dashboard Screen (`/admin`)
+
+**Step 1:** Create `src/pages/Admin.jsx`.
+
+**Step 2:** Add route guard: on mount, check `authStore.role !== 'admin'` → redirect to `/home`.
+
+**Step 3:** Build **Stats Overview** — 4 KPI cards in a 2×2 grid (mobile) / 4-column row (desktop):
+
+* Total Registered Donors (with trend arrow)
+* Total Active Requests (with live Realtime count)
+* Requests Fulfilled Today
+* Average Donor Response Time (minutes)
+
+**Step 4:** Build **Active Requests Table**:
+
+* Columns: Request ID (monospace), Blood Group (badge), Hospital, Status (badge), Donors Pinged, Time Elapsed, Actions
+* Actions: "Expand Radius" button, "Close Request" button
+* Sortable columns, searchable by Request ID
+* Horizontally scrollable on mobile
+
+**Step 5:** Build **Donor Management Table**:
+
+* Columns: Name, Blood Group, City, Status, Last Active, Actions
+* Actions: "Block" / "Unblock" button with confirmation
+* Search + filter by blood group and city
+
+**Step 6:** Build **Analytics Charts** using a charting library (recharts or Chart.js via react-chartjs-2):
+
+* Line chart: Donations per day (last 30 days)
+* Donut chart: Blood group demand distribution
+* Geographic heatmap: Leaflet map with circle markers sized by request density per area
+
+**Step 7:** Build **Broadcast Announcement Composer**:
+
+* Textarea for announcement message
+* Target audience: All Users / Donors Only / Requesters Only
+* "Send Broadcast" button → Supabase Edge Function dispatches push notifications + in-app notifications to all targeted users
+
+**Step 8:** Build **System Health Monitor**:
+
+* Status rows: Supabase DB (green/red dot), SMS Gateway (Twilio), Push Notification Service (FCM)
+* Each row shows last ping time and status label
+* Auto-refreshes every 60 seconds
+
+***
+
+### Task 4.11 – Offline Fallback Screen (`/offline`)
+
+**Step 1:** Create `src/pages/Offline.jsx`.
+
+**Step 2:** Build layout:
+
+* Rudhi logo centered
+* WiFi-off icon (Lucide, large, slate gray)
+* "You're Offline" heading, "No internet connection detected" subtitle
+
+**Step 3:** **Cached Donors Section**:
+
+* "Nearby Donors (Last Known)" subheading
+* Read-only list of donors cached by service worker (from last Supabase fetch)
+* Each item: initials avatar, blood group badge, approximate area, "Cached" chip
+
+**Step 4:** **Emergency SMS Instructions**:
+
+* Clear instructions block with amber background
+* SMS template displayed: `BLOOD [BloodGroup] [YourLocation]`
+* Emergency number displayed prominently
+* "Copy SMS Template" button → `navigator.clipboard.writeText()` with toast
+
+**Step 5:** **Pre-cached Hospital Contacts**:
+
+* List of 3–5 hospitals with name and emergency phone number (cached by service worker on last successful load)
+
+**Step 6:** "Retry Connection" button: calls `navigator.onLine` check → if online, navigates to `/home`.
+
+**Step 7:** Auto-redirect: attach `window.addEventListener('online', ...)` → on event, show "Connection restored!" toast and navigate to `/home` after 1.5 seconds.
+
+***
+
+### Deliverables – Phase 4
+
+* Complete `/donation-history` with stats, filter, list, cooldown banner, badges
+* `/donation-certificate/:donationId` with certificate design and download button
+* `/notifications` with segmented filters, swipe-to-dismiss, and grouped date display
+* `/hospitals` list + map view with `/hospital/:id` detail page
+* `/profile` with stats, badges, and menu list
+* `/availability-settings` with schedule grid, location update, and notification prefs
+* `/my-requests` with filter tabs and repost functionality
+* `/faq` with AI chat widget and accordion
+* `/settings` with all setting categories including dark mode
+* `/admin` with KPI cards, tables, charts, broadcast composer, and health monitor
+* `/offline` fallback with SMS instructions and cached data display
+
+***
+
+## Phase 5: Authentication Implementation
+
+### Objective
+
+Implement the complete authentication system using Supabase Auth, including Phone OTP verification, Google OAuth, session persistence, role-based access control, protected route guards, and profile completion enforcement.
+
+***
+
+### Task 5.1 – Supabase Auth Configuration
+
+**Step 1:** In the Supabase Dashboard:
+
+* Enable **Phone Auth provider** — configure with Twilio SMS credentials (Account SID, Auth Token, Twilio phone number)
+* Enable **Google OAuth provider** — add Google Cloud Console OAuth 2.0 client ID and secret
+* Configure redirect URLs: add the production domain and `localhost:5173` to the allowed list
+* Set OTP expiry to 5 minutes
+
+**Step 2:** Configure `src/lib/supabase.js`:
+
+```js
+import { createClient } from '@supabase/supabase-js'
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    }
+  }
+)
+```
+
+***
+
+### Task 5.2 – Phone OTP Authentication
+
+**Step 1:** Create `src/hooks/useAuth.js` custom hook:
+
+`signInWithPhone(phone)`:
+
+* Formats phone to E.164 format (+91XXXXXXXXXX)
+* Calls `supabase.auth.signInWithOtp({ phone })`
+* Returns `{ success, error }`
+
+`verifyOtp(phone, token)`:
+
+* Calls `supabase.auth.verifyOtp({ phone, token, type: 'sms' })`
+* On success: calls `handleAuthSuccess(session)`
+* Returns `{ user, session, error }`
+
+`handleAuthSuccess(session)`:
+
+* Stores session in `authStore`
+* Checks Supabase `profiles` table for existing profile
+* If no profile found: navigate to `/profile-setup`
+* If profile found: navigate to `/home`
+
+**Step 2:** Wire `signInWithPhone()` to the "Send OTP" button in Auth screen:
+
+* Show loading state on button
+* On success: reveal OTP input field
+* On error: display error message below phone input
+
+**Step 3:** Wire `verifyOtp()` to OTP submission:
+
+* 6-digit OTP input component auto-submits when all 6 digits entered
+* Show loading spinner overlay during verification
+* Handle errors: "Invalid OTP" → clear fields, show error message
+
+**Step 4:** Implement OTP resend:
+
+* 30-second countdown timer starts after OTP sent
+* "Resend OTP" link enabled after timer completes
+* Clicking calls `signInWithPhone()` again
+
+***
+
+### Task 5.3 – Google OAuth Implementation
+
+**Step 1:** Implement `signInWithGoogle()` in `useAuth.js`:
+
+```js
+const signInWithGoogle = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  })
+}
+```
+
+**Step 2:** Create `src/pages/AuthCallback.jsx` at route `/auth/callback`:
+
+* On mount, calls `supabase.auth.exchangeCodeForSession()`
+* Handles `handleAuthSuccess()` and navigates appropriately
+* Shows loading spinner during exchange
+
+**Step 3:** Wire "Continue with Google" button in both Sign In and Sign Up tabs to `signInWithGoogle()`.
+
+***
+
+### Task 5.4 – Session Management & Auth State
+
+**Step 1:** Create `src/providers/AuthProvider.jsx`:
+
+* Wraps the entire app in router
+* On mount: calls `supabase.auth.getSession()` to restore existing session
+* Sets up `supabase.auth.onAuthStateChange()` listener:
+    * `SIGNED_IN`: populate `authStore` with user data + profile from Supabase
+    * `SIGNED_OUT`: clear `authStore`, navigate to `/auth`
+    * `TOKEN_REFRESHED`: update session in store
+* Shows global loading screen while initial session check runs
+
+**Step 2:** Update `authStore.js` with state and actions:
+
+```js
+{
+  user: null,            // Supabase auth user
+  profile: null,         // profiles table row
+  role: null,            // 'donor' | 'requester' | 'hospital_staff' | 'admin'
+  isAuthenticated: false,
+  isLoading: true,
+  setUser, setProfile, setRole, clearAuth
+}
+```
+
+**Step 3:** Create profile fetching function `fetchUserProfile(userId)`:
+
+* Queries Supabase `profiles` table with `user_id = userId`
+* Returns full profile including role, blood group, availability status
+* Updates `authStore.profile` and `authStore.role`
+
+***
+
+### Task 5.5 – Protected Routes & Role-Based Access
+
+**Step 1:** Create `src/components/auth/ProtectedRoute.jsx`:
+
+* Reads `authStore.isAuthenticated` and `authStore.isLoading`
+* If loading: renders `<LoadingSpinner />` full screen
+* If not authenticated: redirects to `/auth` with `replace`
+* If authenticated: renders `<Outlet />`
+
+**Step 2:** Create `src/components/auth/RoleGuard.jsx`:
+
+* Props: `allowedRoles: string[]`
+* Checks `authStore.role` against `allowedRoles`
+* If unauthorized: redirects to `/home`
+* Use for: `/admin` (admin only), hospital search features (hospital\_staff + admin)
+
+**Step 3:** Create `src/components/auth/ProfileCompletionGuard.jsx`:
+
+* Checks if `authStore.profile.setup_complete === false`
+* If incomplete: redirects to `/profile-setup`
+* Wraps all routes that require complete profile
+
+**Step 4:** Apply guards in router:
+
+```
+All routes under AppLayout → ProtectedRoute → ProfileCompletionGuard
+/admin route → additionally wrapped in RoleGuard(['admin'])
+/onboarding and /auth → public routes (no guards)
+```
+
+***
+
+### Task 5.6 – Sign Up Profile Creation
+
+**Step 1:** In `ProfileSetup.jsx`, on "Save & Continue" submit:
+
+* Create `profiles` table row via Supabase insert:
+
+```js
+await supabase.from('profiles').insert({
+  user_id: authStore.user.id,
+  full_name,
+  phone: authStore.user.phone,
+  role,
+  blood_group,
+  city,
+  dob,
+  gender,
+  emergency_contact_name,
+  emergency_contact_phone,
+  availability_status: 'available', // for donors
+  setup_complete: true,
+  location: { lat, lng },
+  notification_preference,
+})
+```
+
+* Upload profile photo to Supabase Storage bucket `avatars/{user_id}`
+* Update `authStore.profile` with new data
+
+**Step 2:** Handle profile photo upload:
+
+* Compress image to max 800×800 before upload using `canvas.toDataURL()`
+* Store public URL in `profiles.avatar_url`
+
+***
+
+### Task 5.7 – Logout Implementation
+
+**Step 1:** In `Profile.jsx` logout handler:
+
+* Show confirmation modal: "Are you sure you want to logout?"
+* On confirm: call `supabase.auth.signOut()`
+* Clear Zustand stores: `authStore.clearAuth()`, `requestStore.reset()`, `notificationStore.reset()`
+* Clear service worker caches for user-specific data
+* Navigate to `/auth`
+
+***
+
+### Deliverables – Phase 5
+
+* Phone OTP sign-in and sign-up fully functional via Supabase Auth
+* Google OAuth sign-in with callback handling
+* Session persistence across browser restarts (localStorage)
+* `AuthProvider` with `onAuthStateChange` listener managing global auth state
+* `ProtectedRoute`, `RoleGuard`, and `ProfileCompletionGuard` components active
+* Profile creation flow on first login writing to Supabase `profiles` table
+* Logout with full state clear implemented
+
+***
+
+## Phase 6: Database, Real-Time & Core Backend
+
+### Objective
+
+Design and implement the complete Supabase PostgreSQL schema with Row-Level Security policies, all real-time subscriptions for live tracking and request updates, Supabase Edge Functions for the donor matching algorithm, push notification dispatch, donation cooldown management, and PDF certificate generation.
+
+***
+
+### Task 6.1 – Database Schema Design
+
+**Step 1:** Create the following tables in Supabase via SQL migrations:
+
+**`profiles` table:**
+
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  full_name TEXT NOT NULL,
+  phone TEXT,
+  role TEXT CHECK (role IN ('donor', 'requester', 'hospital_staff', 'admin')),
+  blood_group TEXT CHECK (blood_group IN ('A+','A-','B+','B-','AB+','AB-','O+','O-')),
+  dob DATE,
+  gender TEXT,
+  city TEXT,
+  location JSONB,  -- { lat, lng }
+  avatar_url TEXT,
+  emergency_contact_name TEXT,
+  emergency_contact_phone TEXT,
+  availability_status TEXT DEFAULT 'available' 
+    CHECK (availability_status IN ('available','unavailable','traveling','on_cooldown')),
+  notification_preference TEXT DEFAULT 'both',
+  alert_radius_km INTEGER DEFAULT 10,
+  setup_complete BOOLEAN DEFAULT FALSE,
+  last_donation_date TIMESTAMPTZ,
+  cooldown_ends_at TIMESTAMPTZ,
+  total_donations INTEGER DEFAULT 0,
+  sms_enabled BOOLEAN DEFAULT TRUE,
+  push_enabled BOOLEAN DEFAULT TRUE,
+  quiet_hours_start TIME,
+  quiet_hours_end TIME,
+  referral_code TEXT UNIQUE DEFAULT LEFT(gen_random_uuid()::TEXT, 8),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`blood_requests` table:**
+
+```sql
+CREATE TABLE blood_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id UUID REFERENCES profiles(id),
+  blood_group TEXT NOT NULL,
+  units_needed INTEGER NOT NULL,
+  urgency_level TEXT CHECK (urgency_level IN ('critical','moderate','routine')),
+  hospital_name TEXT NOT NULL,
+  hospital_location JSONB NOT NULL,  -- { lat, lng, address }
+  hospital_id UUID REFERENCES hospitals(id),
+  patient_name TEXT,
+  notes TEXT,
+  contact_phone TEXT,
+  radius_km INTEGER DEFAULT 10,
+  sms_mode_enabled BOOLEAN DEFAULT FALSE,
+  status TEXT DEFAULT 'searching' 
+    CHECK (status IN ('searching','donor_found','en_route','completed','cancelled')),
+  donors_pinged INTEGER DEFAULT 0,
+  accepted_donor_id UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  closed_at TIMESTAMPTZ
+);
+```
+
+**`donor_pings` table:**
+
+```sql
+CREATE TABLE donor_pings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID REFERENCES blood_requests(id) ON DELETE CASCADE,
+  donor_id UUID REFERENCES profiles(id),
+  status TEXT DEFAULT 'pending' 
+    CHECK (status IN ('pending','accepted','declined','snoozed','expired')),
+  decline_reason TEXT,
+  notified_via TEXT,  -- 'push' | 'sms' | 'both'
+  pinged_at TIMESTAMPTZ DEFAULT NOW(),
+  responded_at TIMESTAMPTZ
+);
+```
+
+**`donations` table:**
+
+```sql
+CREATE TABLE donations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID REFERENCES blood_requests(id),
+  donor_id UUID REFERENCES profiles(id),
+  blood_group TEXT NOT NULL,
+  units_donated INTEGER NOT NULL,
+  hospital_name TEXT NOT NULL,
+  hospital_id UUID REFERENCES hospitals(id),
+  donation_date TIMESTAMPTZ DEFAULT NOW(),
+  feedback_rating INTEGER CHECK (feedback_rating BETWEEN 1 AND 5),
+  feedback_text TEXT,
+  certificate_url TEXT,
+  verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`hospitals` table:**
+
+```sql
+CREATE TABLE hospitals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  city TEXT NOT NULL,
+  location JSONB NOT NULL,
+  phone TEXT,
+  emergency_phone TEXT,
+  blood_bank_available BOOLEAN DEFAULT FALSE,
+  blood_inventory JSONB,  -- { 'O-': 5, 'A+': 12, ... }
+  registered_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`notifications` table:**
+
+```sql
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,  
+  title TEXT NOT NULL,
+  body TEXT,
+  data JSONB,  -- { requestId, donorId, etc. }
+  read BOOLEAN DEFAULT FALSE,
+  seen BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`donor_tracking` table:**
+
+```sql
+CREATE TABLE donor_tracking (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID REFERENCES blood_requests(id),
+  donor_id UUID REFERENCES profiles(id),
+  location JSONB NOT NULL,  -- { lat, lng }
+  eta_minutes INTEGER,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`achievements` table:**
+
+```sql
+CREATE TABLE achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  donor_id UUID REFERENCES profiles(id),
+  badge_type TEXT NOT NULL,
+  earned_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`donor_availability_schedule` table:**
+
+```sql
+CREATE TABLE donor_availability_schedule (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  donor_id UUID REFERENCES profiles(id) UNIQUE,
+  schedule JSONB,  -- { mon: { morning: true, afternoon: false, evening: true }, ... }
+  next_available_date DATE
+);
+```
+
+**`sms_responses` table:**
+
+```sql
+CREATE TABLE sms_responses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_phone TEXT NOT NULL,
+  message_body TEXT NOT NULL,
+  request_id UUID REFERENCES blood_requests(id),
+  donor_id UUID REFERENCES profiles(id),
+  action TEXT,  -- 'accept' | 'decline'
+  processed BOOLEAN DEFAULT FALSE,
+  received_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**`system_announcements` table:**
+
+```sql
+CREATE TABLE system_announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message TEXT NOT NULL,
+  target_role TEXT,  -- null = all, 'donor', 'requester', 'hospital_staff'
+  created_by UUID REFERENCES profiles(id),
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Step 2:** Create database indexes for performance:
+
+```sql
+CREATE INDEX idx_profiles_blood_group ON profiles(blood_group);
+CREATE INDEX idx_profiles_availability_status ON profiles(availability_status);
+CREATE INDEX idx_profiles_city ON profiles(city);
+CREATE INDEX idx_blood_requests_status ON blood_requests(status);
+CREATE INDEX idx_blood_requests_blood_group ON blood_requests(blood_group);
+CREATE INDEX idx_donor_pings_request ON donor_pings(request_id);
+CREATE INDEX idx_donor_pings_donor ON donor_pings(donor_id);
+CREATE INDEX idx_notifications_user ON notifications(user_id, read);
+CREATE INDEX idx_donations_donor ON donations(donor_id);
+CREATE INDEX idx_donor_tracking_request ON donor_tracking(request_id);
+```
+
+**Step 3:** Create a PostGIS-enabled geographic proximity function:
+
+```sql
+CREATE OR REPLACE FUNCTION find_nearby_donors(
+  req_lat FLOAT,
+  req_lng FLOAT,
+  radius_km INTEGER,
+  req_blood_group TEXT
+) RETURNS TABLE(donor_id UUID, distance_km FLOAT) AS $$
+  SELECT 
+    p.id as donor_id,
+    (6371 * acos(
+      cos(radians(req_lat)) * cos(radians((p.location->>'lat')::FLOAT)) *
+      cos(radians((p.location->>'lng')::FLOAT) - radians(req_lng)) +
+      sin(radians(req_lat)) * sin(radians((p.location->>'lat')::FLOAT))
+    )) AS distance_km
+  FROM profiles p
+  WHERE 
+    p.role = 'donor'
+    AND p.availability_status = 'available'
+    AND p.blood_group = ANY(get_compatible_blood_groups(req_blood_group))
+    AND p.cooldown_ends_at IS NULL OR p.cooldown_ends_at < NOW()
+    AND (p.location->>'lat') IS NOT NULL
+  HAVING distance_km <= radius_km
+  ORDER BY distance_km;
+$$ LANGUAGE SQL;
+```
+
+**Step 4:** Create blood group compatibility function:
+
+```sql
+CREATE OR REPLACE FUNCTION get_compatible_blood_groups(needed TEXT)
+RETURNS TEXT[] AS $$
+BEGIN
+  RETURN CASE needed
+    WHEN 'A+' THEN ARRAY['A+', 'A-', 'O+', 'O-']
+    WHEN 'A-' THEN ARRAY['A-', 'O-']
+    WHEN 'B+' THEN ARRAY['B+', 'B-', 'O+', 'O-']
+    WHEN 'B-' THEN ARRAY['B-', 'O-']
+    WHEN 'AB+' THEN ARRAY['A+','A-','B+','B-','AB+','AB-','O+','O-']
+    WHEN 'AB-' THEN ARRAY['A-','B-','AB-','O-']
+    WHEN 'O+' THEN ARRAY['O+', 'O-']
+    WHEN 'O-' THEN ARRAY['O-']
+    ELSE ARRAY[needed]
+  END;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+***
+
+### Task 6.2 – Row-Level Security (RLS) Policies
+
+**Step 1:** Enable RLS on all tables:
+
+```sql
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blood_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donor_pings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donor_tracking ENABLE ROW LEVEL SECURITY;
+```
+
+**Step 2:** Define RLS policies:
+
+`profiles`:
+
+* SELECT: authenticated users can read their own profile; donors can read basic info of other donors (limited columns via view)
+* INSERT: user can only insert their own profile (`user_id = auth.uid()`)
+* UPDATE: user can only update their own profile
+
+`blood_requests`:
+
+* SELECT: authenticated users can read all non-cancelled requests
+* INSERT: authenticated requesters and hospital staff can insert
+* UPDATE: requester can update their own requests; admin can update all
+
+`notifications`:
+
+* SELECT, UPDATE: user can only see/update their own notifications
+
+`donor_pings`:
+
+* SELECT: donor can see their own pings; requester can see pings for their requests
+
+`donor_tracking`:
+
+* SELECT: requester of the related request can read; donor can update their own
+
+**Step 3:** Create a restricted view `public_donor_profiles` that exposes only non-sensitive fields (name initials, blood group, city, availability — no phone, no exact location) for hospital staff searches.
+
+***
+
+### Task 6.3 – Supabase Edge Functions
+
+**Step 1:** Create Edge Function `match-and-ping-donors`:
+
+* Triggered on new `blood_requests` row insert (via database webhook or direct HTTP call after request creation)
+* Input: `{ requestId, bloodGroup, hospitalLocation: {lat, lng}, radiusKm }`
+* Logic:
+    1. Call `find_nearby_donors()` SQL function to get matching donor IDs with distances
+    2. Filter out donors: where `donor_pings` already exists for this request, or in quiet hours
+    3. Insert rows into `donor_pings` table for each matched donor
+    4. Update `blood_requests.donors_pinged` count
+    5. For each donor: call FCM to send push notification (invoke `send-push-notification` function)
+    6. If donor has `sms_enabled`: call Twilio to send SMS alert
+    7. Return: `{ success: true, donorsPinged: N }`
+
+**Step 2:** Create Edge Function `send-push-notification`:
+
+* Input: `{ donorId, requestId, title, body, data }`
+* Fetches donor's FCM token from `profiles.fcm_token`
+* Sends FCM HTTP v1 API request with notification payload and `data.requestId`
+* Logs result
+
+**Step 3:** Create Edge Function `process-sms-response` (Twilio webhook):
+
+* Twilio sends POST to this function when an SMS is received
+* Parses body: extracts keyword (ACCEPT/DECLINE) and request ID
+* Finds donor by phone number in `profiles`
+* Updates `donor_pings` status
+* If ACCEPT: updates `blood_requests.status = 'donor_found'`, sets `accepted_donor_id`
+* Sends confirmation SMS back to donor and requester via Twilio
+* Returns TwiML response
+
+**Step 4:** Create Edge Function `process-sms-request` (for offline mode):
+
+* Receives incoming SMS like `BLOOD O- APOLLO HOSPITAL CHENNAI`
+* Parses blood group and location from message body
+* Geocodes location via Nominatim API
+* Creates `blood_requests` entry
+* Calls `match-and-ping-donors` with the new request
+* Sends acknowledgment SMS to requester
+
+**Step 5:** Create Edge Function `generate-certificate`:
+
+* Input: `{ donationId }`
+* Fetches donation + donor + hospital data from Supabase
+* Generates PDF using Deno-compatible PDF library (jsPDF port or HTML→PDF via Puppeteer-lite)
+* Certificate template populated with: donor name, blood group, date, hospital, certificate ID, Rudhi branding
+* Uploads PDF to Supabase Storage bucket `certificates/{donationId}.pdf`
+* Updates `donations.certificate_url` with public URL
+* Returns `{ certificateUrl }`
+
+**Step 6:** Create Edge Function `expire-cooldown`:
+
+* Scheduled function (cron: runs daily at midnight)
+* Queries `profiles` where `cooldown_ends_at <= NOW()` and `availability_status = 'on_cooldown'`
+* Updates `availability_status = 'available'` and clears `cooldown_ends_at`
+* Sends push notification: "Your donation cooldown has ended! You're eligible to donate again."
+* Triggers `check-achievements` function for each donor
+
+**Step 7:** Create Edge Function `check-achievements`:
+
+* Input: `{ donorId }`
+* Fetches donor's total donations count
+* Checks existing achievements in `achievements` table
+* Awards new badges if thresholds met:
+    * First Donation (1 donation)
+    * 5-Time Hero (5 donations)
+    * Lifesaver of the Month (5 donations in calendar month)
+    * Regular Hero (10 donations)
+    * Veteran Donor (25 donations)
+* Inserts new `achievements` rows and sends in-app + push notification for each new badge
+
+**Step 8:** Create Edge Function `log-donation`:
+
+* Triggered when donor marks "I've Arrived"
+* Input: `{ requestId, donorId, unitsDonated, feedback }`
+* Creates `donations` table row
+* Updates `blood_requests.status = 'completed'`
+* Updates `profiles`: `last_donation_date = NOW()`, `cooldown_ends_at = NOW() + INTERVAL '56 days'`, `availability_status = 'on_cooldown'`, `total_donations += 1`
+* Calls `check-achievements` function
+* Sends completion notifications to requester
+* Calls `generate-certificate` function
+
+***
+
+### Task 6.4 – Supabase Realtime Subscriptions
+
+**Step 1:** Create `src/hooks/useRequestTracking.js`:
+
+* Subscribes to `blood_requests` table changes filtered by `id = requestId`
+* Updates request status in `requestStore` on change
+* Subscribes to `donor_tracking` table changes filtered by `request_id = requestId`
+* Updates donor's live position on the map
+* Subscribes to `donor_pings` changes for the current request to update the pinged donors list
+
+**Step 2:** Create `src/hooks/useDonorTracking.js` (donor-side):
+
+* Uses `navigator.geolocation.watchPosition()` to get GPS updates
+* Every 15 seconds, upserts to `donor_tracking` table: `{ request_id, donor_id, location: {lat, lng}, eta_minutes }`
+* Calculate ETA using haversine distance / average speed (default 30 km/h for city)
+* Stops watching when request is closed or donor marks arrival
+
+**Step 3:** Create `src/hooks/useActiveRequests.js` (for home donor feed):
+
+* Subscribes to `blood_requests` table with filter: `status IN ('searching', 'donor_found')` and blood group compatibility
+* Fetches initial data on mount
+* Listens for INSERT events to add new requests to feed in real time
+
+**Step 4:** Create `src/hooks/useNotifications.js`:
+
+* Subscribes to `notifications` table filtered by current user's `user_id`
+* On INSERT: increments unread count in `notificationStore`, shows toast notification
+* On UPDATE: updates read status in local state
+
+**Step 5:** Implement realtime cleanup — all Supabase Realtime channels unsubscribed in `useEffect` cleanup functions to prevent memory leaks.
+
+***
+
+### Task 6.5 – Data Access Layer (Supabase Queries)
+
+**Step 1:** Create `src/lib/api/` directory with service files:
+
+`requests.js`:
+
+* `createRequest(data)` — inserts into `blood_requests`, triggers Edge Function
+* `getRequest(id)` — fetches request with hospital and donor data
+* `getMyRequests(userId)` — fetches all requests for a requester
+* `closeRequest(id)` — updates status to 'cancelled'
+* `expandRadius(id, newRadius)` — updates radius and re-triggers matching
+
+`donors.js`:
+
+* `updateAvailability(status)` — updates `profiles.availability_status`
+* `respondToPing(pingId, status, reason)` — updates `donor_pings` row
+* `getDonorProfile(id)` — fetches full donor profile
+* `searchDonors(bloodGroup, city, radius)` — queries `public_donor_profiles` view
+
+`donations.js`:
+
+* `getDonationHistory(donorId)` — fetches all donations with hospital data
+* `getDonation(id)` — fetches single donation for certificate
+* `updateDonationFeedback(id, rating, text)` — updates feedback fields
+
+`hospitals.js`:
+
+* `searchHospitals(query, city)` — full-text search on hospitals
+* `getHospital(id)` — fetches hospital detail
+* `getNearbyHospitals(lat, lng, radius)` — proximity query
+
+`notifications.js`:
+
+* `getNotifications(userId)` — fetches all notifications, latest first
+* `markRead(id)` — updates single notification
+* `markAllRead(userId)` — bulk update
+
+`admin.js`:
+
+* `getStats()` — aggregate queries for KPI cards
+* `getActiveRequests()` — admin view of all requests
+* `getAllDonors(filters)` — admin donor management
+* `blockUser(userId)` — updates profile + disables auth
+* `sendBroadcast(message, targetRole)` — calls Edge Function
+
+**Step 2:** Add comprehensive error handling in all API functions:
+
+* Wrap all Supabase calls in try/catch
+* Log errors to console in development
+* Return standardized `{ data, error }` objects
+* Surface user-friendly error messages
+
+***
+
+### Task 6.6 – Supabase Storage Configuration
+
+**Step 1:** Create storage buckets in Supabase Dashboard:
+
+* `avatars` — public bucket, max file size 5MB, allowed types: image/\*
+* `certificates` — public bucket, max file size 10MB, allowed types: application/pdf
+
+**Step 2:** Configure storage RLS:
+
+* `avatars`: users can upload to `{user_id}/*` path; public read
+* `certificates`: donors can read their own certificates; admin can read all
+
+**Step 3:** Implement avatar upload in profile screens:
+
+* Image compression before upload (max 800×800, JPEG quality 80%)
+* Progress indicator during upload
+* On success: update `profiles.avatar_url`
+
+***
+
+### Deliverables – Phase 6
+
+* Complete Supabase PostgreSQL schema with 11 tables, indexes, and SQL functions
+* Row-Level Security policies on all sensitive tables
+* 8 Supabase Edge Functions (matching, push dispatch, SMS processing, certificate generation, cooldown, achievements, donation logging)
+* Realtime subscriptions for tracking, request updates, and notifications
+* Full data access layer (`src/lib/api/`) with error handling
+* Storage buckets configured for avatars and certificates
+* Blood group compatibility function implemented
+
+***
+
+## Phase 7: Third-Party Integrations
+
+### Objective
+
+Integrate all external APIs and services: Twilio SMS for offline emergency mode, Firebase Cloud Messaging for PWA push notifications, Google Maps and OpenStreetMap/Leaflet for routing and navigation, OpenAI GPT-4o for AI assistant features, and Resend for transactional emails.
+
+***
+
+### Task 7.1 – Firebase Cloud Messaging (FCM) for PWA Push Notifications
+
+**Step 1:** Set up Firebase project:
+
+* Create project in Firebase Console
+* Add web app to project, copy config object
+* Enable Cloud Messaging, generate VAPID key pair
+
+**Step 2:** Create `src/lib/firebase.js`:
+
+```js
+import { initializeApp } from 'firebase/app'
+import { getMessaging, getToken, onMessage } from 'firebase/messaging'
+
+const app = initializeApp(firebaseConfig)
+export const messaging = getMessaging(app)
+```
+
+**Step 3:** Create `public/firebase-messaging-sw.js` (service worker for background notifications):
+
+* Import Firebase compat SDK
+* Initialize messaging
+* Handle `onBackgroundMessage`: show notification with `self.registration.showNotification()`
+* On notification click: open app and navigate to relevant route based on `data.requestId`
+
+**Step 4:** Create `src/hooks/usePushNotifications.js`:
+
+* `requestPermission()`: calls `Notification.requestPermission()`; if granted, calls `getToken(messaging, { vapidKey })`
+* `registerToken(token)`: saves FCM token to `profiles.fcm_token` in Supabase
+* `onForegroundMessage()`: calls `onMessage(messaging, handler)` to handle push when app is open — shows in-app toast/notification
+* Call `requestPermission()` after user completes profile setup
+
+**Step 5:** In `AuthProvider.jsx`, after successful login: call `usePushNotifications().requestPermission()` if not yet registered.
+
+**Step 6:** In Supabase Edge Function `send-push-notification`: use FCM HTTP v1 API with service account credentials to dispatch push messages.
+
+***
+
+### Task 7.2 – Twilio SMS Integration
+
+**Step 1:** Configure Twilio in Supabase Edge Functions environment variables:
+
+```
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+RUDHI_SMS_GATEWAY_NUMBER=  (for incoming SMS handling)
+```
+
+**Step 2:** In Edge Function `match-and-ping-donors`: for each SMS-eligible donor:
+
+```js
+const client = require('twilio')(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+await client.messages.create({
+  body: `URGENT BLOOD NEEDED: ${bloodGroup} at ${hospitalName}. Reply ACCEPT ${requestId} to confirm donation. Reply DECLINE ${requestId} to decline.`,
+  from: TWILIO_PHONE_NUMBER,
+  to: donor.phone
+})
+```
+
+**Step 3:** Configure Twilio webhook in Twilio Dashboard:
+
+* Incoming SMS webhook: POST to Supabase Edge Function URL `process-sms-response`
+* Incoming SMS for new requests: POST to `process-sms-request`
+
+**Step 4:** In Edge Function `process-sms-response`:
+
+* Parse body for keywords `ACCEPT [requestId]` or `DECLINE [requestId]` using regex
+* Lookup donor by `from_phone` in profiles
+* Update `donor_pings`, `blood_requests` accordingly
+* Send Twilio response SMS confirming action
+* Return TwiML: `<Response><Message>Thank you! Your response has been recorded.</Message></Response>`
+
+**Step 5:** In `create-request` form (front-end): when SMS Emergency Mode is enabled, display the Rudhi emergency SMS number and instructions template on the offline fallback screen.
+
+**Step 6:** Test SMS flow with Twilio sandbox numbers in development.
+
+***
+
+### Task 7.3 – Maps Integration (Leaflet + Google Maps)
+
+**Step 1:** Complete Leaflet.js integration in all map components:
+
+`MapPicker.jsx` (already scaffolded in Phase 3):
+
+* Finalize Nominatim reverse geocoding on pin drop
+* Add address autocomplete using Nominatim `/search` endpoint with debounce
+
+`LiveMap.jsx` (request tracking):
+
+* Fetch route between donor and hospital using OSRM API:
+
+    ```
+    GET https://router.project-osrm.org/route/v1/driving/{donorLng},{donorLat};{hospitalLng},{hospitalLat}?overview=full&geometries=geojson
+    ```
+* Decode route geometry and draw Leaflet polyline
+* Update donor pin position via Supabase Realtime (already wired in Phase 6)
+* ETA calculation: `distance / averageSpeed` using OSRM response distance
+
+`RouteMap.jsx` (donor navigation):
+
+* Full route polyline from donor start to hospital
+* GPS position updates every 10 seconds via `watchPosition`
+* Recalculate remaining route from current position
+* Leaflet `fitBounds()` to keep both pins visible
+
+**Step 2:** Google Maps JavaScript API integration (optional/premium):
+
+* Load API script dynamically via `useEffect` only when user selects "Google Maps" in settings
+* Use `DirectionsService` and `DirectionsRenderer` for turn-by-turn routes
+* Use `Geocoder` service for address-to-coordinates conversion
+
+**Step 3:** Deep links to native map apps:
+
+* Google Maps: `https://www.google.com/maps/dir/?api=1&destination={lat},{lng}`
+* Apple Maps: `http://maps.apple.com/?daddr={lat},{lng}`
+* Waze: `https://waze.com/ul?ll={lat},{lng}&navigate=yes`
+* Detect Android/iOS via `navigator.userAgent` to show the most relevant option
+
+**Step 4:** OpenStreetMap tile configuration in Leaflet:
+
+```js
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+})
+```
+
+**Step 5:** Hospital search geocoding:
+
+* Nominatim API: `GET https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=5`
+* Cache results in sessionStorage to avoid rate limiting
+
+***
+
+### Task 7.4 – OpenAI GPT-4o Integration
+
+**Step 1:** Create `src/lib/openai.js`:
+
+* Wrapper for OpenAI API calls using `fetch` (no SDK, to minimize bundle size)
+* Passes API key from env variable
+* Includes timeout handling (15 seconds)
+
+**Step 2:** Implement **Blood Request Form Assistant** in `create-request`:
+
+* System prompt: "You are a blood request intake assistant. Extract: blood group (must be one of A+, A-, B+, B-, AB+, AB-, O+, O-), units needed (integer 1-10), hospital name (text), urgency level (critical/moderate/routine) from the user's message. Return JSON: { bloodGroup, units, hospitalName, urgency }."
+* User message sent as single user turn
+* Parse JSON response, auto-populate form fields
+* Handle parse errors: show "Could not understand input, please fill manually"
+
+**Step 3:** Implement **Donor FAQ Chatbot** in `/faq`:
+
+* System prompt: "You are Rudhi's helpful blood donation assistant. Answer questions about: donation eligibility, the donation process, cooldown periods, how the Rudhi app works, blood group compatibility, and SMS emergency mode. Be concise, accurate, and reassuring."
+* Multi-turn conversation: maintain `messages` array in component state
+* Each new user message appended to history, sent as full context
+* Responses rendered with typing animation (character-by-character reveal)
+* Token limit guard: trim older messages if conversation exceeds 8000 tokens
+
+**Step 4:** Implement **Post-Donation Feedback Summarization** (Admin-only):
+
+* Admin dashboard has "AI Insights" section
+* Supabase Edge Function `summarize-feedback`:
+    * Queries last 100 `donations.feedback_text` entries
+    * Sends to GPT-4o: "Summarize the following blood donor feedback into key themes, sentiments, and actionable improvement suggestions for the platform."
+    * Stores summary in `system_announcements` table with type `'ai_insight'`
+    * Admin sees result in dashboard
+
+**Step 5:** Rate limiting: track API calls per user session in `uiStore`; limit to 20 AI requests per hour per user; show "AI limit reached" message if exceeded.
+
+***
+
+### Task 7.5 – Resend Email Integration
+
+**Step 1:** Configure Resend in Supabase Edge Functions environment:
+
+```
+RESEND_API_KEY=
+FROM_EMAIL=noreply@rudhi.app
+```
+
+**Step 2:** Create Edge Function `send-transactional-email`:
+
+* Input: `{ to, template, data }`
+* Templates:
+    * `welcome`: "Welcome to Rudhi! You're now registered as a [role]."
+    * `donation-certificate`: Email with PDF certificate attached (fetched from Supabase Storage)
+    * `cooldown-ended`: "You're eligible to donate again! Log in to update your availability."
+    * `request-update`: "A donor has been found for your blood request."
+
+**Step 3:** Trigger email functions at appropriate points:
+
+* After `process-sms-response` when a request is fulfilled: send `request-update` email to requester
+* After `log-donation`: send `donation-certificate` email with PDF attachment
+* After `expire-cooldown`: send `cooldown-ended` email
+
+**Step 4:** Email templates use HTML with Rudhi branding (crimson red header, clean layout, tagline footer).
+
+***
+
+### Task 7.6 – Browser Geolocation API
+
+**Step 1:** Create `src/hooks/useGeolocation.js`:
+
+* `getCurrentPosition()`: wraps `navigator.geolocation.getCurrentPosition()` in a Promise
+* `watchPosition(callback)`: starts position watching, returns cleanup function
+* Error handling: `PERMISSION_DENIED` → show settings prompt; `POSITION_UNAVAILABLE` → show manual entry; `TIMEOUT` → retry once
+
+**Step 2:** Location permission flow:
+
+* On profile setup: prompt for location with explanation card before triggering API
+* If denied: fall back to city text input with Nominatim geocoding
+
+**Step 3:** Location updates for donor tracking — implement in `useDonorTracking.js` (Phase 6) using `watchPosition`.
+
+***
+
+### Deliverables – Phase 7
+
+* FCM push notifications functional: donor alerts, request updates, achievement notifications
+* Twilio SMS: outbound donor alerts, inbound ACCEPT/DECLINE parsing, SMS-triggered request creation
+* Leaflet maps fully integrated: map picker, live tracking map, donor navigation route
+* Google Maps deep links for native navigation
+* OpenAI GPT-4o: form assistant, FAQ chatbot, admin feedback summarizer
+* Resend email: welcome, certificate, cooldown-ended, request-update emails
+* Geolocation hook with permission handling and fallbacks
+
+***
+
+## Phase 8: PWA Completion & Offline Mode
+
+### Objective
+
+Complete the Progressive Web App configuration including service worker with caching strategies, background sync, offline fallback, install prompt, background push notification handling, and full offline SMS emergency mode testing.
+
+***
+
+### Task 8.1 – Service Worker Configuration
+
+**Step 1:** Complete `vite.config.js` Workbox configuration:
+
+```js
+VitePWA({
+  registerType: 'autoUpdate',
+  includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+  manifest: { /* full manifest */ },
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+    runtimeCaching: [
+      {
+        // OpenStreetMap tiles - cache first
+        urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'osm-tiles',
+          expiration: { maxEntries: 500, maxAgeSeconds: 7 * 24 * 60 * 60 }
+        }
+      },
+      {
+        // Supabase API - network first with fallback
+        urlPattern: /^https:\/\/.*\.supabase\.co\/.*/,
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'supabase-api',
+          expiration: { maxEntries: 50, maxAgeSeconds: 5 * 60 }
+        }
+      },
+      {
+        // Google Fonts
+        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
+        handler: 'StaleWhileRevalidate',
+        options: { cacheName: 'google-fonts-stylesheets' }
+      },
+      {
+        // Font files
+        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/,
+        handler: 'CacheFirst',
+        options: { cacheName: 'google-fonts-webfonts', expiration: { maxAgeSeconds: 365 * 24 * 60 * 60 } }
+      }
+    ]
+  }
+})
+```
+
+**Step 2:** Create `public/sw-custom.js` for custom service worker logic (imported via Workbox's `importScripts`):
+
+* Background sync queue for offline form submissions
+* Handle `fetch` events for the offline fallback page
+* Cache critical data (nearby donors, hospital contacts) on each successful API response
+
+**Step 3:** Register service worker in `src/main.jsx`:
+
+```js
+import { registerSW } from 'virtual:pwa-register'
+const updateSW = registerSW({
+  onNeedRefresh() { /* show "Update available" toast */ },
+  onOfflineReady() { /* show "App ready for offline use" toast */ }
+})
+```
+
+***
+
+### Task 8.2 – Offline Fallback & Background Sync
+
+**Step 1:** Create the offline fallback route in Workbox:
+
+* Set `navigateFallback: '/offline'`
+* Workbox serves `/offline` HTML when network requests fail for navigation
+
+**Step 2:** Implement Background Sync for blood request submissions:
+
+* In `create-request`, if `navigator.onLine === false` when submitting:
+    * Serialize form data and store in IndexedDB using `idb` library
+    * Register a background sync tag: `self.registration.sync.register('sync-blood-request')`
+    * Show toast: "Request queued — will send when connected"
+* In service worker, handle `sync` event with tag `'sync-blood-request'`:
+    * Read pending requests from IndexedDB
+    * Submit to Supabase
+    * Clear IndexedDB on success
+    * Push notification to user: "Your blood request was sent!"
+
+**Step 3:** Cache critical data for offline use:
+
+* After successful home page load: cache nearby donors list in Cache Storage under key `cached-donors`
+* After successful hospitals load: cache hospital phone numbers under `cached-hospitals`
+* Offline screen reads from these caches to display last-known data
+
+**Step 4:** Implement `navigator.onLine` detection in `uiStore`:
+
+```js
+window.addEventListener('online', () => uiStore.setOffline(false))
+window.addEventListener('offline', () => uiStore.setOffline(true))
+```
+
+* When `isOffline` becomes true: show offline banner (persistent top bar, amber)
+* When `isOffline` becomes false: dismiss banner, show "Connected" toast
+
+***
+
+### Task 8.3 – PWA Install Prompt
+
+**Step 1:** Create `src/components/shared/InstallPrompt.jsx`:
+
+* Intercept the browser's `beforeinstallprompt` event in `useEffect`
+* Store `deferredPrompt` event in ref
+* Show custom Rudhi-branded install card after 30 seconds on first visit (if not already installed)
+* Card content: Rudhi blood drop logo, "Add Rudhi to Home Screen", "Get instant alerts even when your browser is closed", Install button + Dismiss button
+
+**Step 2:** Install button handler:
+
+* Call `deferredPrompt.prompt()`
+* Await `deferredPrompt.userChoice`
+* If accepted: hide card, set `localStorage.installDismissed = 'true'`, track event
+* If dismissed: hide card, set localStorage flag, don't show again for 7 days
+
+**Step 3:** Detect if already installed:
+
+* Check `window.matchMedia('(display-mode: standalone)').matches`
+* If true: skip install prompt entirely
+
+**Step 4:** iOS Safari handling:
+
+* Detect iOS via user agent
+* If iOS and not standalone: show Safari-specific instructions modal ("Tap Share → Add to Home Screen")
+
+***
+
+### Task 8.4 – Background Push Notifications (Closed App State)
+
+**Step 1:** Verify `firebase-messaging-sw.js` (created in Phase 7) handles background messages:
+
+* `onBackgroundMessage` handler shows notification with:
+    * Title from notification payload
+    * Body with blood group, hospital, distance
+    * Icon: Rudhi blood drop icon (192px)
+    * Badge: Rudhi badge icon
+    * Actions: `[{ action: 'accept', title: '✅ Accept' }, { action: 'view', title: 'View' }]`
+    * `data: { url: '/donor-alert/{requestId}' }`
+
+**Step 2:** Handle notification click in service worker:
+
+```js
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  if (event.action === 'accept') {
+    // Deep link to accept action
+    event.waitUntil(clients.openWindow(`/donor-alert/${event.notification.data.requestId}?action=accept`))
+  } else {
+    event.waitUntil(clients.openWindow(`/donor-alert/${event.notification.data.requestId}`))
+  }
+})
+```
+
+**Step 3:** Handle notification action `accept` in `DonorAlert.jsx`:
+
+* On mount, check URL params for `?action=accept`
+* If present: auto-trigger acceptance flow after showing brief confirmation animation
+
+***
+
+### Task 8.5 – Manifest & PWA Meta Tags
+
+**Step 1:** Complete `public/manifest.json`:
+
+```json
+{
+  "name": "Rudhi – Blood Bridge",
+  "short_name": "Rudhi",
+  "description": "Find blood donors in real-time. Every second matters.",
+  "start_url": "/home",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#C0152A",
+  "background_color": "#FAF8F6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/home.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow" }
+  ],
+  "categories": ["health", "medical", "utilities"]
+}
+```
+
+**Step 2:** Add PWA meta tags in `index.html`:
+
+```html
+<meta name="theme-color" content="#C0152A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rudhi">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+```
+
+***
+
+### Task 8.6 – Offline SMS Emergency Mode (Front-End)
+
+**Step 1:** In `Offline.jsx` (already scaffolded in Phase 4), wire the complete offline SMS experience:
+
+* Read cached donor data from Cache Storage API
+* Display `RUDHI_SMS_GATEWAY_NUMBER` from pre-cached env config
+* SMS template: `BLOOD [BloodGroup] [Location]`
+* "Copy Template" → `navigator.clipboard.writeText(template)` with success toast
+
+**Step 2:** In `create-request` form, when SMS Emergency Mode is toggled ON and user is online:
+
+* Explain: "This will also send SMS alerts to donors who may be offline"
+* On submit: Edge Function sends SMS to all SMS-enabled donors (already implemented in Phase 6)
+
+**Step 3:** SMS status indicator in request tracking screen:
+
+* Show "SMS alerts sent to X donors" in pinged donors section when SMS mode was enabled
+
+***
+
+### Deliverables – Phase 8
+
+* Workbox service worker with multi-strategy caching (cache-first tiles, network-first API, stale-while-revalidate fonts)
+* Background sync for offline blood request form submissions
+* Custom Rudhi-branded install prompt with iOS Safari fallback
+* Background push notifications with action buttons (Accept, View)
+* Complete offline fallback screen with cached donor data and SMS instructions
+* `navigator.onLine` monitoring with offline banner
+* Full PWA manifest with icons, screenshots, and meta tags
+
+***
+
+## Phase 9: Review, Refactor & Verification
+
+### Objective
+
+Conduct a comprehensive review of the entire implementation against all PRD requirements, perform security audit and hardening, refactor code for maintainability, optimize performance, ensure accessibility compliance, and verify all user flows end-to-end.
+
+***
+
+### Task 9.1 – PRD Feature Verification Checklist
+
+**Step 1:** Systematically verify each PRD section is implemented:
+
+| PRD Section | Feature | Verification Action |
+| ----------- | ------- | ------------------- |
+| 2.1 | User Registration & Roles | Test all 3 role sign-up flows end-to-end |
+| 2.2 | Real-Time Blood Request | Submit request, verify donors pinged within 10 seconds |
+| 2.3 | Donor Matching Algorithm | Test compatibility (O- matches all, AB+ receives from all) |
+| 2.3 | 56-day cooldown enforcement | Verify on\_cooldown donors excluded from matching |
+| 2.3 | Accept/Decline/Snooze | Test all three actions and their downstream effects |
+| 2.4 | Live Donor Tracking | Verify pin updates every 15 seconds on requester map |
+| 2.5 | Navigation & Route | Verify route polyline, ETA, native maps deep links |
+| 2.6 | Offline SMS Mode | Test full SMS flow with Twilio test credentials |
+| 2.7 | Donation History | Verify all donations logged with correct data |
+| 2.7 | Achievement badges | Test badge unlock triggers for each threshold |
+| 2.7 | PDF certificate download | Verify Edge Function generates and downloads PDF |
+| 2.8 | Availability management | Test status toggles, scheduled availability, cooldown reset |
+| 2.9 | Hospital directory | Test search, map view, and "Request Blood Here" |
+| 2.10 | Push notifications | Test all notification types on real devices |
+| 2.11 | Admin dashboard | Verify all tables, charts, and broadcast function |
+| 2.12 | Hospital donor search | Verify anonymized view and no direct contact exposure |
+
+**Step 2:** Verify all 21 screens from PRD Section 5 are implemented and navigable:
+
+* Walk through complete user flow 7.1 (Donor onboarding) — document any gaps
+* Walk through complete user flow 7.2 (Requester creating request) — verify all 19 steps
+* Walk through complete user flow 7.3 (Donor responding) — verify all 23 steps
+* Walk through complete user flow 7.4 (SMS offline mode) — verify all 12 steps
+* Walk through complete user flow 7.5 (Admin monitoring) — verify all 9 steps
+
+**Step 3:** Navigation structure verification — check all routes in PRD Section 6.5 hierarchy exist and are accessible.
+
+***
+
+### Task 9.2 – Security Audit & Hardening
+
+**Step 1:** RLS Policy Audit:
+
+* Attempt to read another user's `notifications` using Supabase client directly — should fail
+* Attempt to update a blood request as a non-owner — should fail
+* Verify admin routes return 403 for non-admin users
+* Test RLS on `donor_tracking` — requester can only see tracking for their own requests
+
+**Step 2:** API Key Security:
+
+* Ensure no sensitive keys (Twilio Auth Token, OpenAI API key, Supabase service role key) are exposed in client-side code
+* All sensitive operations use Supabase Edge Functions (server-side)
+* Verify `.env.local` is in `.gitignore`
+* Audit `vite.config.js` — only `VITE_` prefixed variables exposed to client
+
+**Step 3:** Input Validation & Sanitization:
+
+* Verify all React Hook Form + Zod validations are correctly applied
+* Test SQL injection attempts on search fields — should be blocked by Supabase parameterized queries
+* Validate all text inputs in Edge Functions before processing
+* Sanitize HTML in any rendered user-generated content using DOMPurify
+
+**Step 4:** Authentication Security:
+
+* Test session expiry: verify expired sessions redirect to `/auth`
+* Test route guards: directly navigate to `/admin`, `/profile-setup`, `/home` while unauthenticated — all should redirect to `/auth`
+* Verify Google OAuth state parameter prevents CSRF
+* Test OTP replay attack: verify used OTP cannot be used again
+
+**Step 5:** Privacy Compliance:
+
+* Verify donor exact location is never exposed to requesters (only hospital location + ETA, not donor's starting address)
+* Verify donation history shows anonymized recipient info
+* Verify hospital donor search returns anonymized profiles
+* Verify "Delete Account" flow actually removes all user data from Supabase (cascade deletes + Storage cleanup)
+* GDPR data export includes all user data in JSON format
+
+**Step 6:** Rate Limiting:
+
+* Add rate limiting to Edge Functions using Supabase's built-in or a simple counter in Redis/KV:
+    * `match-and-ping-donors`: max 5 requests per user per hour
+    * `send-push-notification`: max 50 per minute globally
+    * OpenAI calls: 20 per user per hour (already implemented in Phase 7)
+
+***
+
+### Task 9.3 – Performance Optimization
+
+**Step 1:** Bundle Analysis:
+
+* Run `npm run build` and analyze with `rollup-plugin-visualizer`
+* Target: initial JS bundle < 200KB gzipped
+* Identify and apply code splitting for:
+    * Leaflet (large library) → lazy loaded only on map screens
+    * Chart.js (admin only) → lazy loaded on `/admin` route
+    * OpenAI calls → only imported in AI-using components
+    * Admin components → separate chunk via React.lazy + Suspense
+
+**Step 2:** Image Optimization:
+
+* Convert all PNG illustrations to WebP format
+* Add width/height attributes to all `<img>` tags to prevent CLS (Cumulative Layout Shift)
+* Use `loading="lazy"` on below-fold images
+* Ensure SVG icons are inlined (not fetched as separate requests)
+
+**Step 3:** React Performance:
+
+* Audit all components for unnecessary re-renders using React DevTools Profiler
+* Apply `React.memo()` to: `RequestCard`, `NotificationItem`, `DonorCard`, `HospitalCard`
+* Apply `useCallback()` to event handlers passed as props
+* Apply `useMemo()` to expensive computations (blood group filtering, donor list sorting)
+* Verify Zustand store selectors use shallow equality to prevent unnecessary renders
+
+**Step 4:** Supabase Query Optimization:
+
+* Review all queries — add `.select()` with explicit column lists (avoid `SELECT *`)
+* Ensure all list queries have `.limit()` applied (default 20, with pagination)
+* Implement cursor-based pagination for donation history and notification lists
+* Add query result caching in `requestStore` to avoid refetching unchanged data
+
+**Step 5:** Map Performance:
+
+* Implement Leaflet tile caching via service worker (already in Phase 8)
+* Use `L.divIcon` instead of `L.icon` for custom markers (lighter)
+* Limit donor tracking pin update rate to 15 seconds minimum (prevent excessive re-renders)
+* Dispose Leaflet map instances on component unmount to prevent memory leaks
+
+**Step 6:** Measure Core Web Vitals:
+
+* Target: LCP < 2.5s, FID < 100ms, CLS < 0.1
+* Use Lighthouse in Chrome DevTools to measure and document scores
+* Fix any failing metrics before final delivery
+
+***
+
+### Task 9.4 – Accessibility Compliance (WCAG 2.1 AA)
+
+**Step 1:** Color Contrast Audit:
+
+* Test all text/background combinations using axe DevTools or WAVE
+* Verify minimum 4.5:1 for normal text, 3:1 for large text
+* Critical checks: red text on white, amber badges, green success text
+* Fix any failing combinations by darkening text or lightening background
+
+**Step 2:** Touch Target Verification:
+
+* Use browser DevTools to measure all interactive elements
+* Ensure all buttons, links, checkboxes ≥ 44×44px
+* Verify bottom nav tabs are ≥ 44px tall
+* Verify form inputs are ≥ 44px tall
+
+**Step 3:** Screen Reader Labels:
+
+* Add `aria-label` to all icon-only buttons (notification bell, back arrow, close modal)
+* Add `aria-describedby` to form inputs referencing error messages
+* Add `role="status"` to dynamic status badges (request status, availability)
+* Add `aria-live="polite"` to the ETA countdown and notification toasts
+* Add `aria-expanded` to accordion items in FAQ
+* Add `alt` text to all images and illustrations
+
+**Step 4:** Keyboard Navigation:
+
+* Verify full keyboard accessibility: Tab through all interactive elements in logical order
+* Verify Escape closes all modals and bottom sheets
+* Verify Enter/Space activates buttons and toggles
+* Verify focus trap inside modals (Radix UI handles this — verify it's working)
+* Verify skip navigation link for screen readers
+
+**Step 5:** Focus Visibility:
+
+* Ensure all focused elements have visible focus rings (not hidden by `outline: none`)
+* Rudhi focus ring style: 2px solid crimson with 2px offset — applied globally in `globals.css`
+
+**Step 6:** Run automated accessibility audit:
+
+* Use `axe-core` via React Testing Library or browser extension
+* Fix all "critical" and "serious" violations before delivery
+* Document any "minor" violations with remediation plan
+
+***
+
+### Task 9.5 – Dark Mode Implementation Verification
+
+**Step 1:** Apply dark mode class system:
+
+* Verify `uiStore.darkMode` toggle applies `class="dark"` to `<html>` element via `useEffect`
+* Persist preference in `localStorage`
+
+**Step 2:** Audit all components for dark mode variants:
+
+* Every `bg-white` → `bg-white dark:bg-neutral-dark`
+* Every `text-neutral-dark` → `dark:text-white`
+* Every `bg-neutral-light` → `dark:bg-gray-800`
+* Cards: `dark:bg-gray-900 dark:border-gray-700`
+* Map overlays use `dark:bg-opacity-90`
+* Update Tailwind config: `darkMode: 'class'`
+
+**Step 3:** Test dark mode on critical screens: Home, DonorAlert, RequestTracking — ensure map overlays remain readable.
+
+***
+
+### Task 9.6 – Code Refactoring & Quality
+
+**Step 1:** Folder Structure Final Review:
+
+* Ensure no business logic in component files — extract to hooks and API layer
+* Ensure no direct Supabase calls in component files — all use `src/lib/api/` functions
+* Ensure no hardcoded strings — move to constants file `src/lib/constants.js`
+
+**Step 2:** Custom Hooks Extraction — verify these hooks exist and are properly used:
+
+* `useAuth` — authentication actions
+* `useGeolocation` — GPS access
+* `usePushNotifications` — FCM token management
+* `useRequestTracking` — Realtime subscription for tracking
+* `useDonorTracking` — GPS position broadcasting
+* `useActiveRequests` — home feed subscription
+* `useNotifications` — notification center subscription
+* `useOfflineStatus` — online/offline detection
+
+**Step 3:** Error Boundary Implementation:
+
+* Create `src/components/ErrorBoundary.jsx` wrapping major sections
+* Catch unexpected React errors and show graceful fallback UI
+* Log errors to console (and optionally to Supabase logs table)
+
+**Step 4:** Loading State Consistency:
+
+* Audit all data-fetching operations — ensure all have loading states
+* Use skeleton loaders (not spinners) for list and card content
+* Use spinner overlays for action buttons (submit, confirm)
+
+**Step 5:** Toast Notification Audit:
+
+* Verify `react-hot-toast` shows success/error toasts for all actions:
+    * OTP sent, OTP verified, profile saved, request submitted, ping accepted, arrival marked, donation logged, certificate downloaded, availability updated, settings saved, logout confirmed
+
+**Step 6:** TypeScript Migration Plan (Optional — document for future):
+
+* Note all components that would benefit from TypeScript types
+* Document prop types for all shared components
+* Plan for post-MVP TypeScript migration
+
+***
+
+### Task 9.7 – Cross-Device & Cross-Browser Testing
+
+**Step 1:** Test on physical devices:
+
+* Android (Chrome): Install PWA, receive push notification, test GPS tracking
+* iOS (Safari): Verify install prompt instructions, test location permission, verify touch targets
+* Low-end Android device: Test performance — ensure smooth scrolling and map rendering
+
+**Step 2:** Browser compatibility:
+
+* Chrome 90+ (primary target)
+* Safari 14+ (iOS PWA support)
+* Firefox (verify service worker, note FCM limitations on Firefox)
+* Samsung Internet (verify PWA install)
+
+**Step 3:** Network condition testing using Chrome DevTools Network throttling:
+
+* 3G: verify essential features work, skeleton loaders display correctly
+* Offline: verify service worker intercepts, offline screen displays, background sync queues
+
+**Step 4:** Screen size testing:
+
+* 375px (iPhone SE) — minimum supported width
+* 390px (iPhone 14 Pro)
+* 412px (Pixel 7)
+* 768px (tablet — verify layout adapts gracefully)
+
+***
+
+### Task 9.8 – Final Integration Smoke Tests
+
+**Step 1:** Complete end-to-end flow test on staging environment:
+
+1. Register as Donor (Priya, O-, Chennai) via OTP
+2. Register as Requester (another device/browser)
+3. Requester creates O- blood request at Apollo Hospital Chennai, 25km radius, SMS mode ON
+4. Verify Priya receives push notification within 10 seconds
+5. Priya opens donor alert screen, taps "Accept"
+6. Requester sees "Donor Found: Priya" with ETA on tracking screen
+7. Priya's location updates every 15 seconds on requester's map
+8. Priya taps "I've Arrived" — requester notified
+9. Donation logged — certificate generated — cooldown set to 56 days
+10. "First Donation" badge awarded — verify in Priya's profile
+11. Admin logs in — sees completed request in dashboard
+
+**Step 2:** SMS offline mode smoke test:
+
+* Send SMS `BLOOD O- APOLLO HOSPITAL CHENNAI` to Twilio number
+* Verify request created in Supabase within 30 seconds
+* Verify SMS dispatched to registered O- donors in Chennai
+* Reply `ACCEPT [requestId]` — verify acceptance recorded
+* Verify confirmation SMS received
+
+**Step 3:** Edge case testing:
+
+* Submit blood request with no donors in radius — verify "Expand Radius" prompt appears after 5 minutes
+* Donor on cooldown — verify they are excluded from matching
+* Request expires (closed) while donor en route — verify tracking stops
+* Two donors accept simultaneously — verify only first acceptance is processed, second notified request is filled
+
+**Step 4:** Verify PWA install and offline functionality:
+
+* Install on Android device from Chrome
+* Turn off WiFi after loading home screen
+* Verify offline screen appears with cached donors
+* Reconnect — verify auto-redirect to home
+
+***
+
+### Deliverables – Phase 9
+
+* PRD feature verification checklist 100% complete with test results documented
+* Security audit completed: RLS verified, no exposed secrets, input validation confirmed, privacy checks passed
+* Performance metrics: LCP < 2.5s, bundle < 200KB, no critical memory leaks
+* Accessibility: WCAG 2.1 AA compliance achieved, all axe-core critical violations resolved
+* Dark mode verified across all screens
+* Code refactored: business logic in hooks/API layer, error boundaries, consistent loading states
+* Cross-device tested: Android (Chrome), iOS (Safari), 375px–768px screen widths
+* End-to-end smoke tests passed for all 5 major user flows
+* Final production build verified on staging environment
+
+***

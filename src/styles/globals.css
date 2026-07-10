@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #C0152A;
+    --color-primary-light: #F9E5E8;
+    --color-secondary: #FAF8F6;
+    --color-accent: #E8A020;
+    --color-success: #1A9E5C;
+    --color-danger: #EF4444;
+    --color-neutral-dark: #1C1C1E;
+    --color-neutral-mid: #6B7280;
+    --color-neutral-light: #F3F4F6;
+  }
+
+  html.dark {
+    --color-secondary: #0D1B2A;
+    --color-neutral-dark: #F3F4F6;
+    --color-neutral-light: #1C1C1E;
+  }
+
+  body {
+    @apply font-body text-neutral-dark bg-secondary antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold;
+  }
+}
+
+@layer utilities {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

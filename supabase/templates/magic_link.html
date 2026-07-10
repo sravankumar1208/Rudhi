@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:'Inter',sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#f9fafb;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="color:#C0152A;font-size:24px;margin:0;">Rudhi – Blood Bridge</h1>
+    <p style="color:#6B7280;">Your sign-in link</p>
+  </div>
+  <p>Hi there,</p>
+  <p>Click the button below to sign in to your account. This link expires shortly and can only be used once.</p>
+  <div style="margin:32px 0;text-align:center;">
+    <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 32px;background:#C0152A;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Sign In</a>
+  </div>
+  <p style="color:#6B7280;font-size:12px;">Or enter this OTP code manually: <strong>{{ .Token }}</strong></p>
+  <p style="color:#6B7280;font-size:12px;">If you didn't request this, you can safely ignore this email.</p>
+  <p style="color:#6B7280;font-size:12px;">With gratitude,<br/>The Rudhi Team</p>
+</body>
+</html>
