@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { BloodDropIcon } from '../components/ui/BloodDropIcon'
 import { cn } from '../lib/utils'
-import { signInWithPassword, signUpWithPassword, resetPasswordForEmail } from '../lib/auth'
+import { signInWithPassword, signUpWithPassword, signUpWithPasswordCustomRedirect, resetPasswordForEmail } from '../lib/auth'
 import { useAuthStore } from '../store'
 import { upsertProfile, getMyProfile } from '../lib/api/profiles'
 import toast from 'react-hot-toast'
@@ -65,17 +65,15 @@ export const Auth = () => {
     if (signUpPassword.length < 6) return toast.error('Password must be at least 6 characters.')
     setIsLoading(true)
     try {
-      const result = await signUpWithPassword(signUpEmail, signUpPassword)
+      const redirectWithMeta = `${window.location.origin}/auth/callback?name=${encodeURIComponent(signUpName)}&role=${role}`
+      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, redirectWithMeta)
       if (result?.session) {
-        sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
         setUser(result.user)
         await upsertProfile({ full_name: signUpName, role })
-        sessionStorage.removeItem('signup_meta')
         const profile = await getMyProfile()
         setProfile(profile)
         navigate('/profile-setup', { replace: true })
       } else {
-        sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
         setSignUpSent(true)
       }
     } catch (err) {
@@ -213,7 +211,8 @@ export const Auth = () => {
                   onClick={() => {
                     setSignUpSent(false)
                     setIsLoading(true)
-                    signUpWithPassword(signUpEmail, signUpPassword).then((result) => {
+                    const redirectWithMeta = `${window.location.origin}/auth/callback?name=${encodeURIComponent(signUpName)}&role=${role}`
+                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, redirectWithMeta).then((result) => {
                       if (!result?.session) toast.success('Confirmation email resent!')
                       else { setSignUpSent(false); toast.success('Email confirmed!') }
                     }).catch((err) => toast.error(err.message)).finally(() => setIsLoading(false))

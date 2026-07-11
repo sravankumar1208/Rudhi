@@ -36,6 +36,18 @@ export const sendSignUpOtp = async (email) => {
   return data
 }
 
+export const signUpWithPasswordCustomRedirect = async (email, password, redirectUrl) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: redirectUrl || AUTH_REDIRECT,
+    },
+  })
+  if (error) throw wrapAuthError(error)
+  return data
+}
+
 // ─── Email + Password ─────────────────────────────────────────────────────────
 
 export const signUpWithPassword = async (email, password) => {
