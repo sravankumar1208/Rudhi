@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Heart, Building2, KeyRound, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
@@ -13,8 +13,15 @@ import toast from 'react-hot-toast'
 
 export const Auth = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { setUser, setProfile } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('confirmed') === '1') {
+      toast.success('Email confirmed! Please sign in.')
+    }
+  }, [searchParams])
 
   // Sign In
   const [signInEmail, setSignInEmail] = useState('')
@@ -42,6 +49,12 @@ export const Auth = () => {
       const result = await signInWithPassword(signInEmail, signInPassword)
       if (result?.user) {
         setUser(result.user)
+        const sessionMeta = sessionStorage.getItem('signup_meta')
+        if (sessionMeta) {
+          sessionStorage.removeItem('signup_meta')
+          const meta = JSON.parse(sessionMeta)
+          try { await upsertProfile({ full_name: meta.name, role: meta.role }) } catch {}
+        }
         try {
           const profile = await getMyProfile()
           setProfile(profile)
@@ -65,8 +78,8 @@ export const Auth = () => {
     if (signUpPassword.length < 6) return toast.error('Password must be at least 6 characters.')
     setIsLoading(true)
     try {
-      const redirectWithMeta = `${window.location.origin}/auth/callback?name=${encodeURIComponent(signUpName)}&role=${role}`
-      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, redirectWithMeta)
+      sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
+      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, `${window.location.origin}/auth/callback`)
       if (result?.session) {
         setUser(result.user)
         await upsertProfile({ full_name: signUpName, role })
@@ -211,8 +224,8 @@ export const Auth = () => {
                   onClick={() => {
                     setSignUpSent(false)
                     setIsLoading(true)
-                    const redirectWithMeta = `${window.location.origin}/auth/callback?name=${encodeURIComponent(signUpName)}&role=${role}`
-                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, redirectWithMeta).then((result) => {
+                    sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
+                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, `${window.location.origin}/auth/callback`).then((result) => {
                       if (!result?.session) toast.success('Confirmation email resent!')
                       else { setSignUpSent(false); toast.success('Email confirmed!') }
                     }).catch((err) => toast.error(err.message)).finally(() => setIsLoading(false))
