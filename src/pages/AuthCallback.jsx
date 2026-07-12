@@ -1,13 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../store'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+
+function getHashParams() {
+  const hash = window.location.hash
+  if (!hash || hash.length < 2) return {}
+  const params = new URLSearchParams(hash.substring(1))
+  return Object.fromEntries(params.entries())
+}
 
 export const AuthCallback = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const handled = useRef(false)
   const [status, setStatus] = useState('Processing...')
+  const { isAuthenticated } = useAuthStore()
 
   useEffect(() => {
     if (handled.current) return
@@ -18,12 +27,45 @@ export const AuthCallback = () => {
     const type = searchParams.get('type')
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
+    const hashParams = getHashParams()
+    const accessToken = searchParams.get('access_token') || hashParams.access_token
+    const refreshToken = searchParams.get('refresh_token') || hashParams.refresh_token
+    const hashType = hashParams.type || type
+    const isRecovery = (hashType || type) === 'recovery'
+
+    console.log('[Rudhi] AuthCallback params:', { code: !!code, tokenHash: !!tokenHash, type, accessToken: !!accessToken, refreshToken: !!refreshToken, hashParams })
 
     if (error) {
       console.error('[Rudhi] Auth callback error:', error, errorDescription)
       navigate(`/auth?error=${encodeURIComponent(error)}`, { replace: true })
       return
     }
+
+    const navigateAfterAuth = (recovery) => {
+      if (recovery) {
+        navigate('/auth/reset-password', { replace: true })
+      } else {
+        navigate('/home', { replace: true })
+      }
+    }
+
+    const waitForSession = (onReady) => {
+      if (isAuthenticated) {
+        onReady()
+        return undefined
+      }
+      let gone = false
+      const unsub = useAuthStore.subscribe((state) => {
+        if (!gone && state.isAuthenticated) {
+          gone = true
+          unsub()
+          onReady()
+        }
+      })
+      return unsub
+    }
+
+    let cleanup = () => {}
 
     // PKCE flow: exchange authorization code for session
     if (code) {
@@ -33,11 +75,26 @@ export const AuthCallback = () => {
           console.error('[Rudhi] PKCE exchange failed:', exchangeError.message)
           navigate('/auth?error=confirmation_failed', { replace: true })
         } else {
-          setStatus('Email verified! Redirecting...')
-          navigate('/home', { replace: true })
+          setStatus('Email verified! Signing you in...')
+          cleanup = waitForSession(() => navigateAfterAuth(isRecovery)) || cleanup
         }
       })
-      return
+      return () => cleanup()
+    }
+
+    // Token from Supabase server-side verify (access_token/refresh_token pair)
+    if (accessToken && refreshToken) {
+      setStatus('Signing you in...')
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }).then(({ error: sessionError }) => {
+        if (sessionError) {
+          console.error('[Rudhi] Session set failed:', sessionError.message)
+          navigate('/auth?error=confirmation_failed', { replace: true })
+        } else {
+          setStatus('Signed in! Redirecting...')
+          cleanup = waitForSession(() => navigateAfterAuth(isRecovery)) || cleanup
+        }
+      })
+      return () => cleanup()
     }
 
     // Token hash flow: verify OTP token
@@ -48,15 +105,11 @@ export const AuthCallback = () => {
           console.error('[Rudhi] OTP verify failed:', otpError.message)
           navigate('/auth?error=confirmation_failed', { replace: true })
         } else {
-          setStatus('Email verified! Redirecting...')
-          if (type === 'recovery') {
-            navigate('/auth/reset-password', { replace: true })
-          } else {
-            navigate('/home', { replace: true })
-          }
+          setStatus('Email verified! Signing you in...')
+          cleanup = waitForSession(() => navigateAfterAuth(type === 'recovery')) || cleanup
         }
       })
-      return
+      return () => cleanup()
     }
 
     // Fallback: listen for auth state changes
@@ -79,8 +132,9 @@ export const AuthCallback = () => {
     return () => {
       subscription.unsubscribe()
       clearTimeout(timer)
+      cleanup()
     }
-  }, [navigate, searchParams])
+  }, [navigate, searchParams, isAuthenticated])
 
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-4">
