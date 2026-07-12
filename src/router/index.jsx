@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '../layouts/AppLayout'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { ProtectedRoute } from '../components/auth/ProtectedRoute'
+import { AdminRoute } from '../components/auth/AdminRoute'
 import { PageErrorBoundary } from '../components/PageErrorBoundary'
 import { Onboarding } from '../pages/Onboarding'
 import { Auth } from '../pages/Auth'
@@ -87,8 +88,20 @@ export const router = createBrowserRouter([
           { path: '/settings', element: wrap(Settings) },
           { path: '/faq', element: wrap(FAQ) },
           { path: '/about', element: wrap(About) },
-          { path: '/admin', element: wrap(AdminDashboard) },
           { path: '/offline', element: wrap(Offline) },
+        ],
+      },
+    ],
+  },
+
+  // ── Admin: requires authentication + admin role ────────────────────────────
+  {
+    element: <AdminRoute />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [
+          { path: '/admin', element: wrap(AdminDashboard) },
         ],
       },
     ],

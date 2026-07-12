@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
-const AUTH_REDIRECT = `${window.location.origin}/auth/callback`
+const PROD_ORIGIN = 'https://rudhi-blood.netlify.app'
+const AUTH_REDIRECT = `${PROD_ORIGIN}/auth/callback`
 
 function wrapAuthError(err) {
   if (err?.message === 'Failed to fetch') {

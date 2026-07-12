@@ -79,7 +79,7 @@ export const Auth = () => {
     setIsLoading(true)
     try {
       sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
-      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, `${window.location.origin}/auth/callback`)
+      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, 'https://rudhi-blood.netlify.app/auth/callback')
       if (result?.session) {
         setUser(result.user)
         await upsertProfile({ full_name: signUpName, role })
@@ -225,7 +225,7 @@ export const Auth = () => {
                     setSignUpSent(false)
                     setIsLoading(true)
                     sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
-                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, `${window.location.origin}/auth/callback`).then((result) => {
+                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, 'https://rudhi-blood.netlify.app/auth/callback').then((result) => {
                       if (!result?.session) toast.success('Confirmation email resent!')
                       else { setSignUpSent(false); toast.success('Email confirmed!') }
                     }).catch((err) => toast.error(err.message)).finally(() => setIsLoading(false))
