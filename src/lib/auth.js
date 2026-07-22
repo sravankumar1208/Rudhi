@@ -1,7 +1,10 @@
 import { supabase } from './supabase'
 
 const PROD_ORIGIN = 'https://rudhi-blood.netlify.app'
-const AUTH_REDIRECT = `${PROD_ORIGIN}/auth/callback`
+// Callback used by magic‑link sign‑in / sign‑up flows
+export const AUTH_CALLBACK = `${PROD_ORIGIN}/auth/callback`
+// Dedicated redirect for password‑reset emails
+export const RESET_PASSWORD_REDIRECT = `${PROD_ORIGIN}/auth/reset-password`
 
 function wrapAuthError(err) {
   if (err?.message === 'Failed to fetch') {
@@ -18,7 +21,7 @@ export const sendEmailOtp = async (email) => {
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: AUTH_REDIRECT,
+      emailRedirectTo: AUTH_CALLBACK,
     },
   })
   if (error) throw wrapAuthError(error)
@@ -30,7 +33,7 @@ export const sendSignUpOtp = async (email) => {
     email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: AUTH_REDIRECT,
+      emailRedirectTo: AUTH_CALLBACK,
     },
   })
   if (error) throw wrapAuthError(error)
@@ -42,7 +45,7 @@ export const signUpWithPasswordCustomRedirect = async (email, password, redirect
     email,
     password,
     options: {
-      emailRedirectTo: redirectUrl || AUTH_REDIRECT,
+      emailRedirectTo: redirectUrl || AUTH_CALLBACK,
     },
   })
   if (error) throw wrapAuthError(error)
@@ -56,7 +59,7 @@ export const signUpWithPassword = async (email, password) => {
     email,
     password,
     options: {
-      emailRedirectTo: AUTH_REDIRECT,
+      emailRedirectTo: AUTH_CALLBACK,
     },
   })
   if (error) throw wrapAuthError(error)
@@ -97,7 +100,7 @@ export const verifyPhoneOtp = async (phone, token) => {
 
 export const resetPasswordForEmail = async (email) => {
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: AUTH_REDIRECT,
+    redirectTo: RESET_PASSWORD_REDIRECT,
   })
   if (error) throw wrapAuthError(error)
   return data

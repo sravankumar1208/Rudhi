@@ -3,11 +3,12 @@
 const PROJECT_REF = 'glkolpuocczxxfwjiqag'
 const API_BASE = `https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth`
 
-const APP_URL = 'https://rudhi-blood-bridge.vercel.app'
+const APP_URL = 'https://rudhi-blood.netlify.app'
+const LOCAL_URLS = 'http://localhost:5173,http://localhost:3000'
 
 const payload = {
   site_url: APP_URL,
-  uri_allow_list: `${APP_URL},http://localhost:5173,http://localhost:3000`,
+  uri_allow_list: `${APP_URL},${LOCAL_URLS}`,
 }
 
 async function main() {

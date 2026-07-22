@@ -1,17 +1,15 @@
+functionsDirectory = "D:\\Rudhi\\netlify\\functions"
+functionsDirectoryOrigin = "config"
 redirectsOrigin = "config"
 plugins = []
 headers = []
-
-[functions]
-
-[functions."*"]
-node_bundler = "esbuild"
 
 [build]
 publish = "D:\\Rudhi\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
 command = "npm run build"
+functions = "D:\\Rudhi\\netlify\\functions"
 
 [build.environment]
 
@@ -26,6 +24,11 @@ command = "npm run build"
 [build.processing.js]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
 
 [[redirects]]
 from = "/*"

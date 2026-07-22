@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import * as Tabs from '@radix-ui/react-tabs'
-import { Heart, Building2, KeyRound, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Heart, Building2, KeyRound, Mail, ArrowLeft, CheckCircle2, Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { BloodDropIcon } from '../components/ui/BloodDropIcon'
 import { cn } from '../lib/utils'
-import { signInWithPassword, signUpWithPassword, signUpWithPasswordCustomRedirect, resetPasswordForEmail } from '../lib/auth'
+import { signInWithPassword, signUpWithPassword, signUpWithPasswordCustomRedirect, resetPasswordForEmail, updatePassword } from '../lib/auth'
 import { useAuthStore } from '../store'
 import { upsertProfile, getMyProfile } from '../lib/api/profiles'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export const Auth = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { setUser, setProfile } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
+
+  const isResetView = location.pathname === '/auth/reset-password'
 
   useEffect(() => {
     if (searchParams.get('confirmed') === '1') {
@@ -38,6 +42,48 @@ export const Auth = () => {
   const [showForgotPw, setShowForgotPw] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)
+
+  // Reset Password (from email link)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [resetChecking, setResetChecking] = useState(isResetView)
+  const [resetSuccess, setResetSuccess] = useState(false)
+
+  useEffect(() => {
+    if (!isResetView) return
+    let retries = 0
+    const maxRetries = 5
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) { setResetChecking(false); return }
+        if (retries < maxRetries) { retries++; setTimeout(checkSession, 1000) }
+        else { toast.error('Invalid or expired reset link.'); navigate('/auth', { replace: true }) }
+      } catch {
+        if (retries < maxRetries) { retries++; setTimeout(checkSession, 1000) }
+        else { toast.error('Invalid or expired reset link.'); navigate('/auth', { replace: true }) }
+      }
+    }
+    checkSession()
+  }, [isResetView, navigate])
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault()
+    if (newPassword.length < 6) return toast.error('Password must be at least 6 characters.')
+    if (newPassword !== confirmPassword) return toast.error('Passwords do not match.')
+    setIsLoading(true)
+    try {
+      await updatePassword(newPassword)
+      setResetSuccess(true)
+      toast.success('Password reset successfully!')
+      setTimeout(() => navigate('/home', { replace: true }), 2000)
+    } catch (err) {
+      toast.error(err.message || 'Could not reset password.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // ─── Sign In ─────────────────────────────────────────────────────────────────
 
@@ -111,6 +157,91 @@ export const Auth = () => {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // ─── Reset Password Slide ─────────────────────────────────────────────────────
+  if (isResetView) {
+    if (resetChecking) {
+      return (
+        <div className="flex flex-col min-h-screen w-full px-6 py-8 items-center justify-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <BloodDropIcon size={24} className="text-primary animate-pulse" />
+            <span className="font-heading font-bold text-2xl tracking-tight text-neutral-dark dark:text-white">Rudhi</span>
+          </div>
+          <p className="text-sm text-neutral-mid">Verifying your reset link...</p>
+        </div>
+      )
+    }
+
+    if (resetSuccess) {
+      return (
+        <div className="flex flex-col min-h-screen w-full px-6 py-8 items-center justify-center">
+          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle2 size={40} className="text-success" />
+          </div>
+          <h2 className="text-xl font-heading font-bold text-neutral-dark dark:text-white mb-2">Password Reset!</h2>
+          <p className="text-sm text-neutral-mid text-center">Redirecting you to the app...</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col min-h-screen w-full px-6 py-8">
+        <div className="flex items-center justify-center gap-2 mb-8 mt-4">
+          <BloodDropIcon size={24} className="text-primary" />
+          <span className="font-heading font-bold text-2xl tracking-tight text-neutral-dark dark:text-white">Rudhi</span>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <Lock size={20} className="text-primary" />
+          <h2 className="text-2xl font-heading font-bold text-neutral-dark dark:text-white">Set New Password</h2>
+        </div>
+
+        <p className="text-sm text-neutral-mid mb-6">
+          Enter a new password for your account. Make sure it's at least 6 characters.
+        </p>
+
+        <form onSubmit={handleResetSubmit} className="flex flex-col gap-4">
+          <div className="relative">
+            <Input
+              label="New Password"
+              type={showNewPassword ? 'text' : 'password'}
+              placeholder="At least 6 characters"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword(!showNewPassword)}
+              className="absolute right-3 top-[38px] text-neutral-mid hover:text-neutral-dark dark:hover:text-white transition-colors"
+            >
+              {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          <Input
+            label="Confirm New Password"
+            type="password"
+            placeholder="Re-enter your new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+
+          {newPassword && confirmPassword && newPassword !== confirmPassword && (
+            <p className="text-xs text-error -mt-2">Passwords do not match</p>
+          )}
+          {newPassword && newPassword.length < 6 && (
+            <p className="text-xs text-error -mt-2">Password must be at least 6 characters</p>
+          )}
+
+          <Button type="submit" size="lg" className="mt-2" isLoading={isLoading}>
+            Reset Password
+          </Button>
+        </form>
+      </div>
+    )
   }
 
   return (
@@ -191,7 +322,7 @@ export const Auth = () => {
                   onChange={(e) => setSignInPassword(e.target.value)} required />
                 <button
                   type="button"
-                  onClick={() => setShowForgotPw(true)}
+                  onClick={() => navigate('/auth/forgot-password')}
                   className="text-xs text-primary font-medium hover:underline self-end -mt-2"
                 >
                   Forgot Password?

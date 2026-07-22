@@ -36,9 +36,6 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
-  "dependencies": {
-    "nodemailer": "^9.0.3"
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",

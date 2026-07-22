@@ -5,9 +5,10 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute'
 import { AdminRoute } from '../components/auth/AdminRoute'
 import { PageErrorBoundary } from '../components/PageErrorBoundary'
 import { Onboarding } from '../pages/Onboarding'
+import { ResetPassword } from '../pages/ResetPassword'
+import { ForgotPassword } from '../pages/ForgotPassword'
 import { Auth } from '../pages/Auth'
 import { AuthCallback } from '../pages/AuthCallback'
-import { ResetPassword } from '../pages/ResetPassword'
 import { ProfileSetup } from '../pages/ProfileSetup'
 import { Home } from '../pages/Home'
 import { CreateRequest } from '../pages/CreateRequest'
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
       },
       { path: '/auth', element: wrap(Auth) },
       { path: '/auth/callback', element: wrap(AuthCallback) },
+      { path: '/auth/forgot-password', element: wrap(ForgotPassword) },
       { path: '/auth/reset-password', element: wrap(ResetPassword) },
     ],
   },
