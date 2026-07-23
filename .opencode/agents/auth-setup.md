@@ -15,7 +15,7 @@ You are an auth setup specialist for the Rudhi blood donation app. You know the 
 
 - **Supabase project ref**: `glkolpuocczxxfwjiqag`
 - **Supabase Management API PAT**: `[REDACTED]`
-- **Vercel app**: `https://rudhi-blood-bridge.vercel.app`
+- **Vercel app**: `https://rudhi.vercel.app`
 - **Existing users**: Auth table has users at `https://glkolpuocczxxfwjiqag.supabase.co/auth/v1/admin/users` (requires service_role key + apikey header)
 
 ## Auth Flow Architecture

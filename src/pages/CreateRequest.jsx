@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Minus, Plus, AlertCircle, Search, MapPin } from 'lucide-react'
+import { Sparkles, Minus, Plus, AlertCircle, Search, MapPin, User, Home as HomeIcon } from 'lucide-react'
 import * as Switch from '@radix-ui/react-switch'
 import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
 import { MapPicker } from '../components/maps/MapPicker'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
@@ -20,14 +21,19 @@ export const CreateRequest = () => {
   const [smsMode, setSmsMode] = useState(false)
   const [aiMode, setAiMode] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [hospitalLocation, setHospitalLocation] = useState(null)
+
+  // Data for creation
+  const [patientName, setPatientName] = useState('')
+  const [receiverAddress, setReceiverAddress] = useState('')
   const [receiverLocation, setReceiverLocation] = useState(null)
+  const [hospitalLocation, setHospitalLocation] = useState(null)
+  const [hospitalAddress, setHospitalAddress] = useState('')
 
   const [hospitals, setHospitals] = useState([])
   const [hospitalSearch, setHospitalSearch] = useState('')
   const [showHospDropdown, setShowHospDropdown] = useState(false)
   const [selectedHospital, setSelectedHospital] = useState('')
-  const [gpsMode, setGpsMode] = useState('locating') // 'locating' | 'active' | 'off'
+  const [gpsMode, setGpsMode] = useState('locating')
   const hospRef = useRef(null)
 
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -37,7 +43,6 @@ export const CreateRequest = () => {
     { id: 'routine', icon: '🟢', label: 'Routine', desc: 'Planned' }
   ]
 
-  // Load hospitals — detect GPS first, fallback to all
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -46,7 +51,6 @@ export const CreateRequest = () => {
           setHospitals(nearby)
           setGpsMode('active')
         } catch {
-          // RPC might fail if not deployed — fallback to all
           getHospitals().then(setHospitals).catch(() => {})
           setGpsMode('off')
         }
@@ -59,7 +63,6 @@ export const CreateRequest = () => {
     )
   }, [])
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (hospRef.current && !hospRef.current.contains(e.target)) setShowHospDropdown(false)
@@ -75,6 +78,7 @@ export const CreateRequest = () => {
   const selectHospital = (h) => {
     setSelectedHospital(h.name)
     setHospitalSearch(h.name)
+    setHospitalAddress(h.address || '')
     setShowHospDropdown(false)
     if (h.location?.coordinates) {
       setHospitalLocation({ lat: h.location.coordinates[1], lng: h.location.coordinates[0] })
@@ -87,12 +91,17 @@ export const CreateRequest = () => {
     e.preventDefault()
     if (!selectedBg) return toast.error('Select a blood group')
     if (!selectedHospital) return toast.error('Select a hospital')
+    if (!patientName) return toast.error('Enter patient name')
+
     setIsLoading(true)
     try {
       const request = await createBloodRequest({
         hospitalName: selectedHospital,
+        hospitalAddress: hospitalAddress,
         hospitalLat: hospitalLocation?.lat,
         hospitalLng: hospitalLocation?.lng,
+        patientName: patientName,
+        receiverAddress: receiverAddress,
         receiverLat: receiverLocation?.lat,
         receiverLng: receiverLocation?.lng,
         bloodGroup: selectedBg,
@@ -103,16 +112,14 @@ export const CreateRequest = () => {
         smsEnabled: smsMode,
       })
 
-      // Create confirmation notification for requester
       await supabase.from('notifications').insert({
         user_id: user?.id,
         type: 'success',
         title: 'Blood Request Sent',
-        body: `Your request for ${units} unit(s) of ${selectedBg} has been posted. We're finding donors nearby.`,
+        body: `Your request for ${units} unit(s) of ${selectedBg} has been posted.`,
         data: { request_id: request.id },
       })
 
-      // Trigger donor matching in background (don't block UI)
       supabase.functions.invoke('match-donors', { body: { requestId: request.id } }).catch(() => {})
 
       toast.success('Blood request sent!')
@@ -126,7 +133,6 @@ export const CreateRequest = () => {
 
   return (
     <div className="flex flex-col w-full px-4 py-6 gap-6 relative">
-      {/* AI Assistant Toggle */}
       <div className="flex flex-col items-center">
         <Button 
           variant={aiMode ? "primary" : "secondary"}
@@ -145,7 +151,7 @@ export const CreateRequest = () => {
           <label className="text-sm font-medium text-neutral-dark dark:text-white">Describe what you need:</label>
           <textarea 
             className="w-full bg-neutral-light dark:bg-gray-800 rounded-lg p-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent min-h-[80px]"
-            placeholder="E.g., Need 2 units of O- blood urgently at Apollo Hospital, Chennai..."
+            placeholder="E.g., Need 2 units of O- blood urgently at Apollo Hospital..."
           />
           <Button size="sm" className="bg-accent hover:bg-yellow-600 text-white self-end">
             Generate Form
@@ -153,27 +159,41 @@ export const CreateRequest = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        {/* Blood Group */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-neutral-dark dark:text-white">Required Blood Group <span className="text-danger">*</span></label>
-          <div className="grid grid-cols-4 gap-2">
-            {bloodGroups.map(bg => (
-              <button
-                key={bg}
-                type="button"
-                onClick={() => setSelectedBg(bg)}
-                className={cn(
-                  "flex items-center justify-center py-3 rounded-xl border text-lg font-heading font-bold transition-all",
-                  selectedBg === bg 
-                    ? "border-primary bg-primary text-white shadow-md shadow-primary/20 scale-105" 
-                    : "border-neutral-light dark:border-gray-800 bg-white dark:bg-gray-900 text-neutral-dark dark:text-white hover:border-primary/50"
-                )}
-              >
-                {bg}
-              </button>
-            ))}
-          </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 pb-12">
+
+        {/* Patient Details Section */}
+        <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-900 border border-neutral-light dark:border-gray-800 rounded-xl">
+           <div className="flex items-center gap-2 mb-1">
+              <User size={18} className="text-primary" />
+              <h3 className="font-heading font-bold text-neutral-dark dark:text-white uppercase tracking-wider text-xs">Patient Details</h3>
+           </div>
+           <Input
+             label="Patient Name"
+             placeholder="Enter name"
+             value={patientName}
+             onChange={e => setPatientName(e.target.value)}
+             required
+           />
+           <div className="flex flex-col gap-2">
+             <label className="text-sm font-medium text-neutral-dark dark:text-white">Required Blood Group <span className="text-danger">*</span></label>
+             <div className="grid grid-cols-4 gap-2">
+               {bloodGroups.map(bg => (
+                 <button
+                   key={bg}
+                   type="button"
+                   onClick={() => setSelectedBg(bg)}
+                   className={cn(
+                     "flex items-center justify-center py-3 rounded-xl border text-sm font-heading font-bold transition-all",
+                     selectedBg === bg
+                       ? "border-primary bg-primary text-white shadow-md"
+                       : "border-neutral-light dark:border-gray-800 bg-white dark:bg-gray-900 text-neutral-dark dark:text-white"
+                   )}
+                 >
+                   {bg}
+                 </button>
+               ))}
+             </div>
+           </div>
         </div>
 
         {/* Units Needed */}
@@ -184,7 +204,7 @@ export const CreateRequest = () => {
               <Minus size={16} />
             </button>
             <span className="text-xl font-bold font-heading w-6 text-center">{units}</span>
-            <button type="button" onClick={() => setUnits(Math.min(10, units + 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm shadow-primary/30">
+            <button type="button" onClick={() => setUnits(Math.min(10, units + 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white shadow-sm">
               <Plus size={16} />
             </button>
           </div>
@@ -208,11 +228,6 @@ export const CreateRequest = () => {
                   <span className="font-semibold text-neutral-dark dark:text-white">{level.label}</span>
                   <span className="text-xs text-neutral-mid">{level.desc}</span>
                 </div>
-                {urgency === level.id && (
-                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                    <div className="w-2 h-2 bg-white rounded-full" />
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -220,37 +235,20 @@ export const CreateRequest = () => {
 
         {/* Hospital Selector */}
         <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-900 border border-neutral-light dark:border-gray-800 rounded-xl" ref={hospRef}>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-neutral-dark dark:text-white">Hospital / Blood Bank <span className="text-danger">*</span></label>
-            <span className="text-xs text-neutral-mid">Search and select from available facilities</span>
+          <div className="flex items-center gap-2 mb-1">
+             <MapPin size={18} className="text-primary" />
+             <h3 className="font-heading font-bold text-neutral-dark dark:text-white uppercase tracking-wider text-xs">Destination Hospital</h3>
           </div>
-          {gpsMode && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${
-              gpsMode === 'locating'
-                ? 'bg-amber/10 text-amber border border-amber/20'
-                : gpsMode === 'active'
-                ? 'bg-success/5 text-success border border-success/20'
-                : 'bg-neutral-light/50 text-neutral-mid border border-neutral-light'
-            }`}>
-              {gpsMode === 'locating' ? (
-                <><div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Detecting your location...</>
-              ) : gpsMode === 'active' ? (
-                <><MapPin size={14} className="shrink-0" /> Showing hospitals near you — sorted by distance</>
-              ) : (
-                <><MapPin size={14} className="shrink-0" /> Showing all hospitals (GPS unavailable)</>
-              )}
-            </div>
-          )}
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-mid" size={18} />
             <input
               type="text"
-              placeholder="Search hospitals..."
+              placeholder="Search or type hospital name..."
               value={hospitalSearch}
               onChange={(e) => {
                 setHospitalSearch(e.target.value)
-                setSelectedHospital('')
+                setSelectedHospital(e.target.value) // Allow manual entry
                 setShowHospDropdown(true)
               }}
               onFocus={() => setShowHospDropdown(true)}
@@ -271,48 +269,47 @@ export const CreateRequest = () => {
                       <span className="font-semibold text-neutral-dark dark:text-white truncate">{h.name}</span>
                       <span className="text-xs text-neutral-mid truncate">{h.address}</span>
                     </div>
-                    {h.distance_km != null && (
-                      <span className="text-[11px] font-semibold text-primary shrink-0 ml-2">
-                        {h.distance_km < 1 ? `${(h.distance_km * 1000).toFixed(0)}m` : `${h.distance_km.toFixed(1)}km`}
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
             )}
-            {showHospDropdown && hospitalSearch && filteredHospitals.length === 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-neutral-light dark:border-gray-700 rounded-xl shadow-lg z-20 p-4 text-center text-sm text-neutral-mid">
-                No hospitals found matching "{hospitalSearch}"
-              </div>
-            )}
           </div>
-          {selectedHospital && (
-            <div className="flex items-center gap-2 text-xs text-success bg-success/5 border border-success/20 rounded-xl px-3 py-2">
-              <MapPin size={14} />
-              {hospitalLocation
-                ? `${selectedHospital} — location set`
-                : `${selectedHospital} selected (no coordinates available)`}
-            </div>
-          )}
+
+          <Input
+            label="Exact Hospital Address"
+            placeholder="E.g., Floor 3, Emergency Ward"
+            value={hospitalAddress}
+            onChange={e => setHospitalAddress(e.target.value)}
+          />
+
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-neutral-dark dark:text-white">Or set location manually</label>
-            <MapPicker onLocationChange={(loc) => setHospitalLocation(loc)} />
+            <label className="text-sm font-medium text-neutral-dark dark:text-white">Pin Hospital on Map (Optional)</label>
+            <MapPicker defaultLocation={hospitalLocation} onLocationChange={setHospitalLocation} />
           </div>
         </div>
 
         {/* Receiver / Patient Location */}
         <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-900 border border-neutral-light dark:border-gray-800 rounded-xl">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-neutral-dark dark:text-white">Your Location (Receiver)</label>
-            <span className="text-xs text-neutral-mid">Where should the donor come to?</span>
+          <div className="flex items-center gap-2 mb-1">
+             <HomeIcon size={18} className="text-accent" />
+             <h3 className="font-heading font-bold text-neutral-dark dark:text-white uppercase tracking-wider text-xs">Pickup / Meeting Point</h3>
           </div>
-          <MapPicker onLocationChange={(loc) => setReceiverLocation(loc)} />
+          <Input
+            label="Pickup Address"
+            placeholder="E.g., Apartment A, 4th Street"
+            value={receiverAddress}
+            onChange={e => setReceiverAddress(e.target.value)}
+          />
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-neutral-dark dark:text-white">Pin Meeting Point on Map</label>
+            <MapPicker defaultLocation={receiverLocation} onLocationChange={setReceiverLocation} />
+          </div>
         </div>
 
         {/* Donor Radius */}
         <div className="flex flex-col gap-3 p-4 bg-white dark:bg-gray-900 border border-neutral-light dark:border-gray-800 rounded-xl">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-neutral-dark dark:text-white">Alert Radius</label>
+            <label className="text-sm font-medium text-neutral-dark dark:text-white">Broadcast Alert Radius</label>
             <span className="font-bold text-primary">{radius} km</span>
           </div>
           <input 
@@ -322,13 +319,10 @@ export const CreateRequest = () => {
             onChange={(e) => setRadius(parseInt(e.target.value))}
             className="w-full accent-primary" 
           />
-          <div className="flex justify-between text-xs text-neutral-mid font-medium">
+          <div className="flex justify-between text-xs text-neutral-mid font-medium font-mono">
             <span>5km</span>
             <span>25km</span>
             <span>50km</span>
-          </div>
-          <div className="mt-2 text-sm text-center bg-primary/5 text-primary rounded-lg py-2 font-medium">
-            ~14 donors available within {radius} km
           </div>
         </div>
 
@@ -348,7 +342,7 @@ export const CreateRequest = () => {
               Enable SMS Emergency Mode <AlertCircle size={14} className="text-accent" />
             </span>
             <span className="text-xs text-neutral-mid mt-0.5 leading-relaxed">
-              Sends standard SMS alerts to matching donors who don't have internet access. Highly recommended for critical requests.
+              Highly recommended for critical requests.
             </span>
           </div>
         </div>

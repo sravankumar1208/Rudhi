@@ -16,7 +16,7 @@ const SUBJECTS = {
 
 const BRAND = { name: 'Rudhi – Blood Bridge', color: '#C0152A', bg: '#f9fafb' };
 const SUPABASE_URL = 'https://glkolpuocczxxfwjiqag.supabase.co';
-const SITE_URL = 'https://rudhi-blood.netlify.app';
+const SITE_URL = 'https://rudhi.vercel.app';
 
 function wrap(body) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:'Inter',sans-serif;max-width:480px;margin:0 auto;padding:32px;background:${BRAND.bg};"><div style="text-align:center;margin-bottom:24px;"><h1 style="color:${BRAND.color};font-size:24px;margin:0;">${BRAND.name}</h1></div>${body}<p style="color:#6B7280;font-size:12px;text-align:center;">With gratitude,<br/>The Rudhi Team</p></body></html>`;

@@ -5,14 +5,16 @@ import { supabase } from '../supabase'
  */
 export const createBloodRequest = async ({
   hospitalName,
+  hospitalAddress,
   hospitalLat,
   hospitalLng,
+  patientName,
+  receiverAddress,
   receiverLat,
   receiverLng,
   bloodGroup,
   units = 1,
   urgency = 'critical',
-  patientName,
   notes,
   alertRadiusKm = 10,
   smsEnabled = false,
@@ -25,16 +27,18 @@ export const createBloodRequest = async ({
     .insert({
       requester_id: user.id,
       hospital_name: hospitalName,
+      hospital_address: hospitalAddress,
       hospital_location: hospitalLat && hospitalLng
         ? `POINT(${hospitalLng} ${hospitalLat})`
         : null,
+      patient_name: patientName,
+      receiver_address: receiverAddress,
       receiver_location: receiverLat && receiverLng
         ? `POINT(${receiverLng} ${receiverLat})`
         : null,
       blood_group: bloodGroup,
       units_needed: units,
       urgency,
-      patient_name: patientName,
       notes,
       alert_radius_km: alertRadiusKm,
       sms_enabled: smsEnabled,
@@ -50,6 +54,7 @@ export const createBloodRequest = async ({
  * Fetch a single request with its donor responses.
  */
 export const getRequest = async (requestId) => {
+  // Use a query that expands the geometry to GeoJSON for reliable frontend parsing
   const { data, error } = await supabase
     .from('blood_requests')
     .select(`
@@ -70,7 +75,6 @@ export const getRequest = async (requestId) => {
  * Get active requests near a location (for the donor home feed).
  */
 export const getNearbyRequests = async () => {
-  // Use PostGIS via RPC or manual filter – here we use a simple distance filter
   const { data, error } = await supabase
     .from('blood_requests')
     .select('*')
@@ -145,6 +149,8 @@ export const updateReceiverLocation = async (requestId, lat, lng) => {
     .from('blood_requests')
     .update({ receiver_location: point })
     .eq('id', requestId)
+    .select()
+    .single()
 
   if (error) throw error
   return data

@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge'
 import { supabase } from '../lib/supabase'
 import { getRequest, respondToRequest } from '../lib/api/requests'
 import { useGeolocation } from '../hooks/useGeolocation'
+import { parseLocation } from '../lib/utils'
 import toast from 'react-hot-toast'
 
 export const DonorAlert = () => {
@@ -42,36 +43,25 @@ export const DonorAlert = () => {
   }, [requestId, navigate])
 
   const handleAccept = async () => {
+    // 1. EXTRACT DESTINATION IMMEDIATELY (BYPASS POPUP BLOCKER)
+    const dst = parseLocation(request?.hospital_location) || parseLocation(request?.receiver_location)
+
+    if (dst) {
+      const origin = latitude && longitude ? `&origin=${latitude},${longitude}` : ''
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1${origin}&destination=${dst.lat},${dst.lng}`
+      console.log('[Rudhi] Opening Maps:', mapsUrl)
+      window.open(mapsUrl, '_blank')
+    } else {
+      console.warn('[Rudhi] No valid destination found in request:', request)
+    }
+
+    // 2. CONTINUE WITH ACTION
     setActionLoading(true)
     try {
-      // Ensure request data is loaded before picking destination
-      let req = request
-      if (!req) {
-        req = await getRequest(requestId)
-      }
-
-      // Use hospital location first, fallback to receiver
-      const dst = req?.hospital_location?.coordinates
-        ? [req.hospital_location.coordinates[1], req.hospital_location.coordinates[0]]
-        : req?.receiver_location?.coordinates
-        ? [req.receiver_location.coordinates[1], req.receiver_location.coordinates[0]]
-        : null
-
-      // Open Google Maps synchronously (before await — browser popup blocker won't block it)
-      if (dst) {
-        const origin = latitude && longitude ? `&origin=${latitude},${longitude}` : ''
-        window.open(
-          `https://www.google.com/maps/dir/?api=1${origin}&destination=${dst[0]},${dst[1]}`,
-          '_blank'
-        )
-      } else {
-        toast.error('Hospital has no location set. Navigate manually from the tracking page.')
-      }
-
       await respondToRequest(requestId, 'accepted')
-
       navigate(`/donor-navigation/${requestId}`)
-    } catch {
+    } catch (err) {
+      console.error('[Rudhi] Accept failed:', err)
       toast.error('Failed to accept request')
     } finally {
       setActionLoading(false)
@@ -104,11 +94,6 @@ export const DonorAlert = () => {
           transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
           className="absolute w-64 h-64 border-4 border-white rounded-full"
         />
-        <motion.div 
-          animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
-          transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut", delay: 0.5 }}
-          className="absolute w-80 h-80 border-2 border-white rounded-full"
-        />
       </div>
 
       <div className="flex-1 flex flex-col p-6 pt-16 z-10 relative">
@@ -116,9 +101,9 @@ export const DonorAlert = () => {
           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-2 shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse">
             <AlertTriangle className="text-danger" size={40} />
           </div>
-          <h1 className="text-4xl font-heading font-black tracking-tight uppercase">URGENT<br/>BLOOD REQUIRED</h1>
+          <h1 className="text-4xl font-heading font-black tracking-tight uppercase leading-none">URGENT<br/>NEED</h1>
           <p className="text-white/90 text-lg font-medium max-w-[280px]">
-            A patient near you is in critical condition and needs your help.
+             Emergency {bg} blood request near you.
           </p>
         </div>
 
@@ -129,7 +114,7 @@ export const DonorAlert = () => {
                 {bg}
               </div>
               <div className="flex flex-col">
-                <span className="font-bold text-lg leading-tight">{hospitalName}</span>
+                <span className="font-bold text-lg leading-tight truncate max-w-[180px]">{hospitalName}</span>
                 <span className="text-sm text-neutral-mid font-medium">Patient: {patientName}</span>
               </div>
             </div>
@@ -138,24 +123,15 @@ export const DonorAlert = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-neutral-mid font-semibold uppercase tracking-wider flex items-center gap-1">
-                <MapPin size={12} /> Distance
+                <MapPin size={12} /> Priority
               </span>
-              <span className="font-bold text-lg">2.4 km</span>
+              <Badge variant="status" status="active" className="w-fit">{urgency.toUpperCase()}</Badge>
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-xs text-neutral-mid font-semibold uppercase tracking-wider flex items-center gap-1">
-                <Clock size={12} /> Est. Time
-              </span>
-              <span className="font-bold text-lg text-primary">12 mins</span>
-            </div>
-            <div className="flex flex-col gap-1 col-span-2 mt-1">
-              <span className="text-xs text-neutral-mid font-semibold uppercase tracking-wider flex items-center gap-1">
                 <Droplet size={12} /> Requirement
               </span>
-              <div className="flex gap-2 mt-1">
-                <Badge className="bg-danger/10 text-danger border border-danger/20">{units} Unit{units > 1 ? 's' : ''}</Badge>
-                <Badge variant="status" status="active">{urgency.charAt(0).toUpperCase() + urgency.slice(1)}</Badge>
-              </div>
+              <span className="font-bold text-lg text-primary">{units} Unit{units > 1 ? 's' : ''}</span>
             </div>
           </div>
 
@@ -166,9 +142,6 @@ export const DonorAlert = () => {
             <div className="flex gap-3">
               <Button variant="secondary" className="flex-1 border-neutral-light bg-neutral-light/50 hover:bg-neutral-light text-neutral-dark" onClick={handleDecline} disabled={actionLoading}>
                 Decline
-              </Button>
-              <Button variant="secondary" className="flex-1 border-neutral-light bg-neutral-light/50 hover:bg-neutral-light text-neutral-dark" disabled={actionLoading}>
-                Remind in 10m
               </Button>
             </div>
           </div>

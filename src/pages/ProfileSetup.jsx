@@ -12,8 +12,9 @@ import toast from 'react-hot-toast'
 export const ProfileSetup = () => {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
-  const role = profile?.role || sessionStorage.getItem('signup_meta')
-    ? JSON.parse(sessionStorage.getItem('signup_meta') || '{}').role
+  const signupMeta = localStorage.getItem('signup_meta') || sessionStorage.getItem('signup_meta')
+  const role = profile?.role || signupMeta
+    ? JSON.parse(signupMeta || '{}').role
     : 'donor'
 
   const [step, setStep] = useState(1)
@@ -54,6 +55,7 @@ export const ProfileSetup = () => {
         is_available: isAvailable,
         location: location ? `POINT(${location.lng} ${location.lat})` : null,
       })
+      localStorage.removeItem('signup_meta')
       sessionStorage.removeItem('signup_meta')
       toast.success('Profile saved!')
       navigate('/home', { replace: true })

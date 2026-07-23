@@ -6,24 +6,6 @@ import './styles/globals.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './components/AuthProvider'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { registerSW } from 'virtual:pwa-register'
-
-const updateSW = registerSW({
-  onNeedRefresh() {
-    if (confirm('New version available! Update to get the latest features?')) {
-      updateSW(true)
-    }
-  },
-  onOfflineReady() {
-    console.log('App ready for offline use')
-  },
-  onRegistered(swRegistration) {
-    // Check for updates every hour
-    setInterval(() => {
-      swRegistration.update()
-    }, 60 * 60 * 1000)
-  },
-})
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

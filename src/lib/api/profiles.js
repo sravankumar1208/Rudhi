@@ -70,8 +70,13 @@ export const updateDonorLocation = async (lat, lng, userId) => {
 
   const { data, error } = await supabase
     .from('profiles')
-    .update({ location: point, updated_at: new Date().toISOString() })
+    .update({
+      location: point,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', userId)
+    .select()
+    .single()
 
   if (error) throw error
   return data

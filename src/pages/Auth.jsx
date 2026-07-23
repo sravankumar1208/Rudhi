@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { BloodDropIcon } from '../components/ui/BloodDropIcon'
 import { cn } from '../lib/utils'
-import { signInWithPassword, signUpWithPassword, signUpWithPasswordCustomRedirect, resetPasswordForEmail, updatePassword } from '../lib/auth'
+import { signInWithPassword, signUpWithPassword, signUpWithPasswordCustomRedirect, AUTH_CALLBACK, resendVerification } from '../lib/auth'
 import { useAuthStore } from '../store'
 import { upsertProfile, getMyProfile } from '../lib/api/profiles'
 import { supabase } from '../lib/supabase'
@@ -16,10 +16,20 @@ export const Auth = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { setUser, setProfile } = useAuthStore()
+  const { setUser, setProfile, isAuthenticated } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
 
-  const isResetView = location.pathname === '/auth/reset-password'
+  useEffect(() => {
+    // Only auto-redirect if we ARE NOT in the middle of a password recovery
+    // This stops the "teleportation" bug where the app takes you home before the reset is finished
+    const isRecovery = location.search.includes('recovery') ||
+                      location.search.includes('type=recovery') ||
+                      window.location.hash.includes('recovery')
+
+    if (isAuthenticated && !isRecovery) {
+      navigate('/home', { replace: true })
+    }
+  }, [isAuthenticated, navigate, location.search])
 
   useEffect(() => {
     if (searchParams.get('confirmed') === '1') {
@@ -38,62 +48,23 @@ export const Auth = () => {
   const [role, setRole] = useState('donor')
   const [signUpSent, setSignUpSent] = useState(false)
 
-  // Forgot Password
-  const [showForgotPw, setShowForgotPw] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetSent, setResetSent] = useState(false)
-
-  // Reset Password (from email link)
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showNewPassword, setShowNewPassword] = useState(false)
-  const [resetChecking, setResetChecking] = useState(isResetView)
-  const [resetSuccess, setResetSuccess] = useState(false)
-
-  useEffect(() => {
-    if (!isResetView) return
-    let retries = 0
-    const maxRetries = 5
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) { setResetChecking(false); return }
-        if (retries < maxRetries) { retries++; setTimeout(checkSession, 1000) }
-        else { toast.error('Invalid or expired reset link.'); navigate('/auth', { replace: true }) }
-      } catch {
-        if (retries < maxRetries) { retries++; setTimeout(checkSession, 1000) }
-        else { toast.error('Invalid or expired reset link.'); navigate('/auth', { replace: true }) }
-      }
-    }
-    checkSession()
-  }, [isResetView, navigate])
-
-  const handleResetSubmit = async (e) => {
-    e.preventDefault()
-    if (newPassword.length < 6) return toast.error('Password must be at least 6 characters.')
-    if (newPassword !== confirmPassword) return toast.error('Passwords do not match.')
-    setIsLoading(true)
-    try {
-      await updatePassword(newPassword)
-      setResetSuccess(true)
-      toast.success('Password reset successfully!')
-      setTimeout(() => navigate('/home', { replace: true }), 2000)
-    } catch (err) {
-      toast.error(err.message || 'Could not reset password.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   // ─── Sign In ─────────────────────────────────────────────────────────────────
 
   const handlePasswordSignIn = async (e) => {
     e.preventDefault()
-    if (!signInEmail || !signInPassword) return toast.error('Enter email and password.')
+    const email = signInEmail.toLowerCase().trim()
+    const password = signInPassword.trim()
+
+    if (!email || !password) return toast.error('Enter email and password.')
     setIsLoading(true)
     try {
-      const result = await signInWithPassword(signInEmail, signInPassword)
+      const result = await signInWithPassword(email, password)
       if (result?.user) {
+        // Clear any stale reset or signup metadata
+        localStorage.removeItem('pending_password_reset')
+        localStorage.removeItem('signup_meta')
+        sessionStorage.removeItem('signup_meta')
+
         setUser(result.user)
         const sessionMeta = sessionStorage.getItem('signup_meta')
         if (sessionMeta) {
@@ -120,12 +91,22 @@ export const Auth = () => {
 
   const handlePasswordSignUp = async (e) => {
     e.preventDefault()
-    if (!signUpName || !signUpEmail || !signUpPassword) return toast.error('Please fill all fields.')
-    if (signUpPassword.length < 6) return toast.error('Password must be at least 6 characters.')
+    const email = signUpEmail.toLowerCase().trim()
+    const password = signUpPassword.trim()
+    const name = signUpName.trim()
+
+    if (!name || !email || !password) return toast.error('Please fill all fields.')
+    if (password.length < 6) return toast.error('Password must be at least 6 characters.')
     setIsLoading(true)
     try {
-      sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
-      const result = await signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, 'https://rudhi-blood.netlify.app/auth/callback')
+      console.log('[Rudhi] Starting Sign Up for:', email)
+      const meta = JSON.stringify({ name: name, role })
+      localStorage.setItem('signup_meta', meta)
+      sessionStorage.setItem('signup_meta', meta)
+
+      const result = await signUpWithPasswordCustomRedirect(email, password, AUTH_CALLBACK)
+      console.log('[Rudhi] Sign Up result:', result)
+
       if (result?.session) {
         setUser(result.user)
         await upsertProfile({ full_name: signUpName, role })
@@ -136,112 +117,11 @@ export const Auth = () => {
         setSignUpSent(true)
       }
     } catch (err) {
+      console.error('[Rudhi] Sign Up Error Object:', err)
       toast.error(err.message || 'Could not create account.')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // ─── Forgot Password ─────────────────────────────────────────────────────────
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault()
-    if (!resetEmail) return toast.error('Enter your email.')
-    setIsLoading(true)
-    try {
-      await resetPasswordForEmail(resetEmail)
-      setResetSent(true)
-      toast.success('Check your email for the reset link.')
-    } catch (err) {
-      toast.error(err.message || 'Could not send reset email.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // ─── Reset Password Slide ─────────────────────────────────────────────────────
-  if (isResetView) {
-    if (resetChecking) {
-      return (
-        <div className="flex flex-col min-h-screen w-full px-6 py-8 items-center justify-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <BloodDropIcon size={24} className="text-primary animate-pulse" />
-            <span className="font-heading font-bold text-2xl tracking-tight text-neutral-dark dark:text-white">Rudhi</span>
-          </div>
-          <p className="text-sm text-neutral-mid">Verifying your reset link...</p>
-        </div>
-      )
-    }
-
-    if (resetSuccess) {
-      return (
-        <div className="flex flex-col min-h-screen w-full px-6 py-8 items-center justify-center">
-          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 size={40} className="text-success" />
-          </div>
-          <h2 className="text-xl font-heading font-bold text-neutral-dark dark:text-white mb-2">Password Reset!</h2>
-          <p className="text-sm text-neutral-mid text-center">Redirecting you to the app...</p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex flex-col min-h-screen w-full px-6 py-8">
-        <div className="flex items-center justify-center gap-2 mb-8 mt-4">
-          <BloodDropIcon size={24} className="text-primary" />
-          <span className="font-heading font-bold text-2xl tracking-tight text-neutral-dark dark:text-white">Rudhi</span>
-        </div>
-
-        <div className="flex items-center gap-2 mb-2">
-          <Lock size={20} className="text-primary" />
-          <h2 className="text-2xl font-heading font-bold text-neutral-dark dark:text-white">Set New Password</h2>
-        </div>
-
-        <p className="text-sm text-neutral-mid mb-6">
-          Enter a new password for your account. Make sure it's at least 6 characters.
-        </p>
-
-        <form onSubmit={handleResetSubmit} className="flex flex-col gap-4">
-          <div className="relative">
-            <Input
-              label="New Password"
-              type={showNewPassword ? 'text' : 'password'}
-              placeholder="At least 6 characters"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowNewPassword(!showNewPassword)}
-              className="absolute right-3 top-[38px] text-neutral-mid hover:text-neutral-dark dark:hover:text-white transition-colors"
-            >
-              {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <Input
-            label="Confirm New Password"
-            type="password"
-            placeholder="Re-enter your new password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-
-          {newPassword && confirmPassword && newPassword !== confirmPassword && (
-            <p className="text-xs text-error -mt-2">Passwords do not match</p>
-          )}
-          {newPassword && newPassword.length < 6 && (
-            <p className="text-xs text-error -mt-2">Password must be at least 6 characters</p>
-          )}
-
-          <Button type="submit" size="lg" className="mt-2" isLoading={isLoading}>
-            Reset Password
-          </Button>
-        </form>
-      </div>
-    )
   }
 
   return (
@@ -263,76 +143,27 @@ export const Auth = () => {
 
         {/* ── SIGN IN ──────────────────────────────────────────────────────── */}
         <Tabs.Content value="signin" className="flex flex-col flex-1 focus:outline-none">
-          {showForgotPw ? (
-            <div className="flex flex-col gap-4">
-              <button
-                type="button"
-                onClick={() => { setShowForgotPw(false); setResetSent(false) }}
-                className="flex items-center gap-2 text-sm text-neutral-mid hover:text-neutral-dark dark:hover:text-white transition-colors self-start"
-              >
-                <ArrowLeft size={16} /> Back to sign in
-              </button>
+          <div className="flex items-center gap-2 mb-4">
+            <KeyRound size={20} className="text-primary" />
+            <h2 className="text-2xl font-heading font-bold text-neutral-dark dark:text-white">Welcome Back</h2>
+          </div>
 
-              <div className="flex items-center gap-2 mb-2">
-                <Mail size={20} className="text-primary" />
-                <h2 className="text-2xl font-heading font-bold text-neutral-dark dark:text-white">Reset Password</h2>
-              </div>
-
-              {resetSent ? (
-                <div className="flex flex-col items-center gap-3 p-6 bg-success/5 border border-success/20 rounded-xl text-center mt-4">
-                  <CheckCircle2 size={40} className="text-success" />
-                  <p className="font-semibold text-neutral-dark dark:text-white">Check your email</p>
-                  <p className="text-sm text-neutral-mid">
-                    We sent a password reset link to <strong className="text-neutral-dark dark:text-white">{resetEmail}</strong>
-                  </p>
-                  <Button variant="secondary" size="sm" className="mt-2" onClick={() => { setShowForgotPw(false); setResetSent(false) }}>
-                    Back to Sign In
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
-                  <p className="text-sm text-neutral-mid">
-                    Enter your email and we'll send you a link to reset your password.
-                  </p>
-                  <Input
-                    label="Email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    required
-                  />
-                  <Button type="submit" size="lg" className="mt-2" isLoading={isLoading}>
-                    Send Reset Link
-                  </Button>
-                </form>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-4">
-                <KeyRound size={20} className="text-primary" />
-                <h2 className="text-2xl font-heading font-bold text-neutral-dark dark:text-white">Welcome Back</h2>
-              </div>
-
-              <form onSubmit={handlePasswordSignIn} className="flex flex-col gap-4 flex-1">
-                <Input label="Email" type="email" placeholder="you@example.com" value={signInEmail}
-                  onChange={(e) => setSignInEmail(e.target.value)} required />
-                <Input label="Password" type="password" placeholder="Enter your password" value={signInPassword}
-                  onChange={(e) => setSignInPassword(e.target.value)} required />
-                <button
-                  type="button"
-                  onClick={() => navigate('/auth/forgot-password')}
-                  className="text-xs text-primary font-medium hover:underline self-end -mt-2"
-                >
-                  Forgot Password?
-                </button>
-                <Button type="submit" size="lg" className="mt-2" isLoading={isLoading}>
-                  Sign In
-                </Button>
-              </form>
-            </>
-          )}
+          <form onSubmit={handlePasswordSignIn} className="flex flex-col gap-4 flex-1">
+            <Input label="Email" type="email" placeholder="you@example.com" value={signInEmail}
+              onChange={(e) => setSignInEmail(e.target.value)} required />
+            <Input label="Password" type="password" placeholder="Enter your password" value={signInPassword}
+              onChange={(e) => setSignInPassword(e.target.value)} required />
+            <button
+              type="button"
+              onClick={() => navigate('/auth/forgot-password')}
+              className="text-xs text-primary font-medium hover:underline self-end -mt-2"
+            >
+              Forgot Password?
+            </button>
+            <Button type="submit" size="lg" className="mt-2" isLoading={isLoading}>
+              Sign In
+            </Button>
+          </form>
         </Tabs.Content>
 
         {/* ── SIGN UP ──────────────────────────────────────────────────────── */}
@@ -352,14 +183,16 @@ export const Auth = () => {
                   variant="secondary"
                   size="lg"
                   className="w-full"
-                  onClick={() => {
-                    setSignUpSent(false)
+                  onClick={async () => {
                     setIsLoading(true)
-                    sessionStorage.setItem('signup_meta', JSON.stringify({ name: signUpName, role }))
-                    signUpWithPasswordCustomRedirect(signUpEmail, signUpPassword, 'https://rudhi-blood.netlify.app/auth/callback').then((result) => {
-                      if (!result?.session) toast.success('Confirmation email resent!')
-                      else { setSignUpSent(false); toast.success('Email confirmed!') }
-                    }).catch((err) => toast.error(err.message)).finally(() => setIsLoading(false))
+                    try {
+                      await resendVerification(signUpEmail)
+                      toast.success('Confirmation email resent!')
+                    } catch (err) {
+                      toast.error(err.message || 'Could not resend email.')
+                    } finally {
+                      setIsLoading(false)
+                    }
                   }}
                   isLoading={isLoading}
                 >

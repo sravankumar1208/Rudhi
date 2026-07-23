@@ -10,7 +10,7 @@ const SMTP_USER = Deno.env.get('SMTP_USER') ?? ''
 const SMTP_PASS = Deno.env.get('SMTP_PASS') ?? ''
 const SMTP_FROM = Deno.env.get('SMTP_FROM') ?? 'Rudhi <sy7616956@gmail.com>'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? 'https://glkolpuocczxxfwjiqag.supabase.co'
-const SITE_URL = 'https://rudhi-blood.netlify.app'
+const SITE_URL = 'https://rudhi.vercel.app'
 
 const SUBJECTS: Record<string, string> = {
   signup: 'Confirm your email address – Rudhi',

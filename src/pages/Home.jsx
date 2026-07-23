@@ -11,19 +11,40 @@ import { useAuthStore, useNotificationStore } from '../store'
 
 import { getNearbyRequests } from '../lib/api/requests'
 import { getMyDonations } from '../lib/api/donations'
-import { setDonorAvailability } from '../lib/api/profiles'
+import { setDonorAvailability, updateDonorLocation } from '../lib/api/profiles'
+import { useGeolocation } from '../hooks/useGeolocation'
 import toast from 'react-hot-toast'
 
 export const Home = () => {
   const navigate = useNavigate()
-  const { profile, role } = useAuthStore()
+  const { profile, role, user } = useAuthStore()
   const { unreadCount } = useNotificationStore()
+  const { latitude, longitude } = useGeolocation()
+
   const [isAvailable, setIsAvailable] = useState(profile?.is_available ?? true)
   const [requests, setRequests] = useState([])
   const [donationsCount, setDonationsCount] = useState(0)
   const [stats, setStats] = useState({ donorsNearby: 0, activeRequests: 0 })
   const [loading, setLoading] = useState(true)
   const fetching = useRef(false)
+
+  // Background Location Broadcast for Donors
+  useEffect(() => {
+    if (role !== 'donor' || !user?.id || !latitude || !longitude) return
+
+    const broadcast = async () => {
+      try {
+        console.log('[Rudhi] Background location update:', { latitude, longitude })
+        await updateDonorLocation(latitude, longitude, user.id)
+      } catch (e) {
+        console.warn('[Rudhi] Background location update failed')
+      }
+    }
+
+    broadcast() // Update immediately
+    const interval = setInterval(broadcast, 30000) // Then every 30s
+    return () => clearInterval(interval)
+  }, [role, user?.id, latitude, longitude])
 
   useEffect(() => {
     const load = async () => {
