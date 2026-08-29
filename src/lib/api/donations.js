@@ -13,6 +13,15 @@ export const logDonation = async ({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // Get current request details
+  const { data: request, error: reqError } = await supabase
+    .from('blood_requests')
+    .select('units_needed')
+    .eq('id', requestId)
+    .single()
+    
+  if (reqError) throw reqError
+
   const { data, error } = await supabase
     .from('donations')
     .insert({
@@ -28,6 +37,19 @@ export const logDonation = async ({
     .single()
 
   if (error) throw error
+
+  // Update blood_requests status if fulfilled
+  const newUnitsNeeded = Math.max(0, request.units_needed - unitsDonated)
+  const newStatus = newUnitsNeeded <= 0 ? 'fulfilled' : 'searching'
+
+  await supabase
+    .from('blood_requests')
+    .update({ 
+      units_needed: newUnitsNeeded,
+      status: newStatus 
+    })
+    .eq('id', requestId)
+
   return data
 }
 

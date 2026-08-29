@@ -24,8 +24,10 @@ export const DonationCertificate = () => {
   }, [donationId])
 
   const donorName = profile?.full_name || 'Donor'
-  const date = donation?.donated_at ? new Date(donation.donated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'
-  const hospital = donation?.blood_requests?.hospital_name || donation?.hospital_name || 'Hospital'
+  const date = donation?.donated_at 
+    ? new Date(donation.donated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) 
+    : new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const hospital = donation?.hospital_name || donation?.blood_requests?.hospital_name || 'Hospital'
   const displayId = donationId?.slice(0, 8)?.toUpperCase() || 'RUDHI-0000'
 
   const handleShare = async () => {
@@ -80,7 +82,9 @@ export const DonationCertificate = () => {
         <h3 className="text-2xl font-bold text-neutral-dark dark:text-white border-b-2 border-neutral-light dark:border-gray-800 pb-2 mb-6 w-full px-4">{donorName}</h3>
 
         <p className="text-xs text-neutral-mid max-w-[240px] mb-8 leading-relaxed">
-          For their noble act of donating blood and helping save a life at <span className="font-bold text-neutral-dark dark:text-white">{hospital}</span> on <span className="font-bold text-neutral-dark dark:text-white">{date}</span>.
+          For their noble act of donating blood and helping save a life at{" "}
+          <strong className="font-bold text-neutral-dark dark:text-white">{hospital}</strong> on{" "}
+          <span className="font-bold text-neutral-dark dark:text-white">{date}</span>.
         </p>
 
         <div className="mt-auto flex justify-between w-full px-4 items-end">

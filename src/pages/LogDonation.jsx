@@ -42,7 +42,7 @@ export const LogDonation = () => {
           toast.error('Photo upload failed, but logging donation anyway...', { duration: 4000 })
         }
       }
-      await logDonation({
+      const donation = await logDonation({
         requestId,
         hospitalName: request?.hospital_name || 'Hospital',
         unitsDonated: units,
@@ -52,7 +52,7 @@ export const LogDonation = () => {
       setIsSubmitting(false)
       setIsSuccess(true)
       setTimeout(() => {
-        navigate(`/donation-certificate/${requestId}`)
+        navigate(`/donation-certificate/${donation.id}`)
       }, 3000)
     } catch (err) {
       toast.error(err.message || 'Failed to log donation')

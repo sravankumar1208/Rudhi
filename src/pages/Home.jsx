@@ -78,7 +78,7 @@ export const Home = () => {
         () => load()
       )
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'blood_requests', filter: `status=in.(searching,matched)` },
+        { event: 'UPDATE', schema: 'public', table: 'blood_requests' },
         () => load()
       )
       .subscribe()
