@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { logDonation, uploadDonationProof } from '../lib/api/donations'
 import { getRequest } from '../lib/api/requests'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export const LogDonation = () => {
@@ -31,31 +32,64 @@ export const LogDonation = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!photoFile) {
+      toast.error('A donation proof photo is required to log your donation.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const request = await getRequest(requestId)
-      let proofUrl = null
-      if (photoFile) {
-        const donationId = crypto.randomUUID?.() || `don-${Date.now()}`
-        proofUrl = await uploadDonationProof(photoFile, donationId)
-        if (!proofUrl) {
-          toast.error('Photo upload failed, but logging donation anyway...', { duration: 4000 })
-        }
+      
+      toast.loading("Uploading photo...", { id: "donation-log" })
+      const donationId = crypto.randomUUID?.() || `don-${Date.now()}`
+      const proofUrl = await uploadDonationProof(photoFile, donationId)
+      
+      if (!proofUrl) {
+        toast.error('Photo upload failed. Please try again.', { id: "donation-log" })
+        setIsSubmitting(false)
+        return
       }
+
+      toast.loading("Verifying with Grok AI...", { id: "donation-log" })
+      
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-donation-proof', {
+        body: { 
+          imageUrl: proofUrl, 
+          donorName: 'Donor', 
+          hospitalName: request?.hospital_name || 'Hospital',
+          unitsDonated: units
+        }
+      })
+
+      if (verifyError || !verifyData || !verifyData.isAuthorized) {
+        const reason = verifyData?.reason || verifyError?.message || "Verification failed."
+        toast.error(`Authorization Failed: ${reason}`, { id: "donation-log", duration: 6000 })
+        setIsSubmitting(false)
+        return
+      }
+
+      toast.loading("Saving donation...", { id: "donation-log" })
+
       const donation = await logDonation({
         requestId,
         hospitalName: request?.hospital_name || 'Hospital',
         unitsDonated: units,
         proofUrl,
         feedback,
+        aiAuthorized: true,
+        aiNotes: verifyData.reason,
       })
+
       setIsSubmitting(false)
+      toast.success("Donation Verified & Logged!", { id: "donation-log" })
       setIsSuccess(true)
       setTimeout(() => {
         navigate(`/donation-certificate/${donation.id}`)
       }, 3000)
     } catch (err) {
-      toast.error(err.message || 'Failed to log donation')
+      toast.error(err.message || 'Failed to log donation', { id: "donation-log" })
       setIsSubmitting(false)
     }
   }
@@ -93,7 +127,7 @@ export const LogDonation = () => {
         
         {/* Verification Photo */}
         <div className="flex flex-col gap-3">
-          <label className="text-sm font-medium text-neutral-dark dark:text-white">Upload Donation Proof (Optional)</label>
+          <label className="text-sm font-medium text-neutral-dark dark:text-white">Upload Donation Proof (Mandatory)</label>
           <label className="relative w-full h-40 rounded-xl bg-neutral-light dark:bg-gray-800 border-2 border-dashed border-neutral-mid flex flex-col items-center justify-center cursor-pointer overflow-hidden group">
             {photo ? (
               <>

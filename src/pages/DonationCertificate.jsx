@@ -92,8 +92,13 @@ export const DonationCertificate = () => {
             <div className="w-24 border-b border-neutral-dark dark:border-gray-500 mb-1" />
             <span className="text-[10px] text-neutral-mid font-medium uppercase tracking-wider">Authorized</span>
           </div>
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
-            <span className="text-[10px] font-bold text-primary transform -rotate-12">VERIFIED</span>
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 mb-1">
+              <span className="text-[10px] font-bold text-primary transform -rotate-12">VERIFIED</span>
+            </div>
+            {donation?.ai_authorized && (
+              <span className="text-[8px] text-primary font-bold tracking-wider">by Grok AI</span>
+            )}
           </div>
         </div>
       </div>
