@@ -20,6 +20,8 @@ export const CreateRequest = () => {
   const [radius, setRadius] = useState(10)
   const [smsMode, setSmsMode] = useState(false)
   const [aiMode, setAiMode] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [isParsingAI, setIsParsingAI] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   // Data for creation
@@ -82,6 +84,39 @@ export const CreateRequest = () => {
     setShowHospDropdown(false)
     if (h.location?.coordinates) {
       setHospitalLocation({ lat: h.location.coordinates[1], lng: h.location.coordinates[0] })
+    }
+  }
+
+  const handleParseAI = async () => {
+    if (!aiPrompt) return
+    setIsParsingAI(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-request', {
+        body: { prompt: aiPrompt }
+      })
+
+      if (error) throw error
+
+      if (data) {
+        if (data.bloodGroup && bloodGroups.includes(data.bloodGroup)) {
+          setSelectedBg(data.bloodGroup)
+        }
+        if (data.units) setUnits(data.units)
+        if (data.urgency && urgencyLevels.find(u => u.id === data.urgency.toLowerCase())) {
+          setUrgency(data.urgency.toLowerCase())
+        }
+        if (data.hospitalName) {
+          setHospitalSearch(data.hospitalName)
+          setSelectedHospital(data.hospitalName)
+        }
+        if (data.patientName) setPatientName(data.patientName)
+        
+        toast.success('Form autofilled successfully!')
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to parse request with AI')
+    } finally {
+      setIsParsingAI(false)
     }
   }
 
@@ -152,8 +187,17 @@ export const CreateRequest = () => {
           <textarea 
             className="w-full bg-neutral-light dark:bg-gray-800 rounded-lg p-3 text-sm focus:outline-none focus:ring-1 focus:ring-accent min-h-[80px]"
             placeholder="E.g., Need 2 units of O- blood urgently at Apollo Hospital..."
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
           />
-          <Button size="sm" className="bg-accent hover:bg-yellow-600 text-white self-end">
+          <Button 
+            size="sm" 
+            className="bg-accent hover:bg-yellow-600 text-white self-end"
+            onClick={handleParseAI}
+            isLoading={isParsingAI}
+            disabled={!aiPrompt}
+            type="button"
+          >
             Generate Form
           </Button>
         </div>

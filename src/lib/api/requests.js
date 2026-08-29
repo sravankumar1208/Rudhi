@@ -22,6 +22,14 @@ export const createBloodRequest = async ({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
+  // UPSERT fallback to ensure profile exists and prevent foreign key constraint failure
+  await supabase.from('profiles').upsert({
+    id: user.id,
+    email: user.email,
+    full_name: user.user_metadata?.full_name || 'Anonymous User',
+    role: 'donor'
+  }, { onConflict: 'id', ignoreDuplicates: true })
+
   const { data, error } = await supabase
     .from('blood_requests')
     .insert({
