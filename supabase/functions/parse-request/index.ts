@@ -25,7 +25,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
@@ -48,22 +48,32 @@ If a field is not found, leave it empty or provide a safe default.`
       })
     })
 
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Groq API Error: ${response.status} - ${errText}`)
+    }
+
     const data = await response.json()
     
     if (data.error) {
       throw new Error(data.error.message)
     }
 
-    const parsedContent = JSON.parse(data.choices[0].message.content)
+    const content = data.choices[0].message.content
+    // Handle cases where the model wraps JSON in markdown blocks
+    const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim()
+    
+    const parsedContent = JSON.parse(cleanContent)
 
     return new Response(
       JSON.stringify(parsedContent),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
+    // Return 200 so the client can read the JSON error message instead of failing with generic non-2xx
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status: 200, 
     })
   }
 })

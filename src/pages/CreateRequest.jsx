@@ -96,6 +96,7 @@ export const CreateRequest = () => {
       })
 
       if (error) throw error
+      if (data && data.error) throw new Error(data.error)
 
       if (data) {
         if (data.bloodGroup && bloodGroups.includes(data.bloodGroup)) {
