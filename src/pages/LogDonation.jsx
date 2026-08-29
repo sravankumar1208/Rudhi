@@ -38,6 +38,9 @@ export const LogDonation = () => {
       if (photoFile) {
         const donationId = crypto.randomUUID?.() || `don-${Date.now()}`
         proofUrl = await uploadDonationProof(photoFile, donationId)
+        if (!proofUrl) {
+          toast.error('Photo upload failed, but logging donation anyway...', { duration: 4000 })
+        }
       }
       await logDonation({
         requestId,

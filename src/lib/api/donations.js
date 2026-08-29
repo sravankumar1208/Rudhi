@@ -52,18 +52,26 @@ export const getMyDonations = async () => {
  * Upload a proof image to Supabase Storage and return its public URL.
  */
 export const uploadDonationProof = async (file, donationId) => {
-  const ext = file.name.split('.').pop()
-  const path = `donation-proofs/${donationId}.${ext}`
+  try {
+    const ext = file.name.split('.').pop()
+    const path = `donation-proofs/${donationId}.${ext}`
 
-  const { error: uploadError } = await supabase.storage
-    .from('rudhi-uploads')
-    .upload(path, file, { upsert: true })
+    const { error: uploadError } = await supabase.storage
+      .from('rudhi-uploads')
+      .upload(path, file, { upsert: true })
 
-  if (uploadError) throw uploadError
+    if (uploadError) {
+      console.warn('Storage upload error:', uploadError)
+      return null
+    }
 
-  const { data } = supabase.storage
-    .from('rudhi-uploads')
-    .getPublicUrl(path)
+    const { data } = supabase.storage
+      .from('rudhi-uploads')
+      .getPublicUrl(path)
 
-  return data.publicUrl
+    return data.publicUrl
+  } catch (err) {
+    console.warn('Unexpected error uploading proof:', err)
+    return null
+  }
 }
