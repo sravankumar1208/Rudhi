@@ -9,8 +9,6 @@ export const logDonation = async ({
   unitsDonated = 1,
   proofUrl,
   feedback,
-  aiAuthorized = false,
-  aiNotes = '',
 }) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -26,8 +24,6 @@ export const logDonation = async ({
       units_donated: unitsDonated,
       proof_url: proofUrl,
       feedback,
-      ai_authorized: aiAuthorized,
-      ai_notes: aiNotes,
       status: 'pending',
     })
     .select()
