@@ -299,7 +299,11 @@ async function runAllTests() {
   try {
     console.log('\n[Report Generator] Generating Excel summary and test details report (300+ test cases)...');
     const reportScript = path.join(__dirname, '..', 'generate_report.py');
-    execSync(`python "${reportScript}"`, { stdio: 'inherit' });
+    try {
+      execSync(`python "${reportScript}"`, { stdio: 'inherit' });
+    } catch (pErr) {
+      execSync(`python3 "${reportScript}"`, { stdio: 'inherit' });
+    }
     console.log('[Report Generator] Test Execution Report generated successfully with 100% PASS rate!');
   } catch (reportErr) {
     console.log(`[Report Generator Note] Python report generation trigger: ${reportErr.message}`);

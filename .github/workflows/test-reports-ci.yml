@@ -37,7 +37,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: selenium-web-report
-          path: selenium-tests/Test_Execution_Report.xlsx
+          path: |
+            selenium-tests/Test_Execution_Report.xlsx
+            selenium-tests/selenium-web-report.xlsx
           retention-days: 30
 
   appium-tests:
@@ -69,7 +71,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: appium-android-report
-          path: appium-tests/Appium_Test_Execution_Report.xlsx
+          path: |
+            appium-tests/Appium_Test_Execution_Report.xlsx
+            appium-tests/appium-android-report.xlsx
           retention-days: 30
 
   unit-tests:
@@ -169,7 +173,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: load-test-report
-          path: load-tests/Baseline_Load_Test_Report.xlsx
+          path: |
+            load-tests/Baseline_Load_Test_Report.xlsx
+            load-tests/load-test-report.xlsx
           retention-days: 30
 
   master-report:
@@ -208,6 +214,8 @@ jobs:
       - name: "Compile Master E2E Executive Report"
         run: |
           python -m pip install openpyxl
+          python selenium-tests/generate_report.py
+          python appium-tests/generate_appium_report.py
           python master-report/compile_master.py
 
       - name: "Upload Master Report & Android APK"
@@ -216,5 +224,14 @@ jobs:
           name: full-e2e-report
           path: |
             master-report/full-e2e-report.xlsx
+            selenium-tests/Test_Execution_Report.xlsx
+            selenium-tests/selenium-web-report.xlsx
+            appium-tests/Appium_Test_Execution_Report.xlsx
+            appium-tests/appium-android-report.xlsx
+            unit-tests/unit-test-report.xlsx
+            validation-tests/validation-test-report.xlsx
+            deployment-tests/deployment-test-report.xlsx
+            load-tests/Baseline_Load_Test_Report.xlsx
+            load-tests/load-test-report.xlsx
             RudhiAndroid/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
