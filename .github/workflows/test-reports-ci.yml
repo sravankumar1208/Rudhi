@@ -8,74 +8,213 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-all-tests-and-generate-artifacts:
-    name: "Execute 4 Test Suites & Generate Excel Artifacts"
+  selenium-tests:
+    name: "Selenium — Website Tests (300)"
     runs-on: ubuntu-latest
-
     steps:
-      - name: "📥 Checkout Repository"
+      - name: "Checkout Repository"
         uses: actions/checkout@v4
 
-      - name: "🟢 Setup Node.js Runtime"
+      - name: "Setup Node.js & Python"
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: "🐍 Setup Python Environment"
+      - name: "Install Dependencies"
+        run: |
+          npm install
+          python -m pip install openpyxl
+
+      - name: "Run Selenium Test Suite & Export Matrix"
+        run: |
+          node selenium-tests/tests/login-tests.js || true
+          python selenium-tests/generate_report.py
+
+      - name: "Upload Selenium Web Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-web-report
+          path: selenium-tests/Test_Execution_Report.xlsx
+          retention-days: 30
+
+  appium-tests:
+    name: "Appium — Android Tests (300)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Node.js & Python"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Install Dependencies"
+        run: |
+          npm install
+          python -m pip install openpyxl
+
+      - name: "Run Appium Test Suite & Export Matrix"
+        run: |
+          node appium-tests/tests/app-tests.js || true
+          python appium-tests/generate_appium_report.py
+
+      - name: "Upload Appium Android Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-android-report
+          path: appium-tests/Appium_Test_Execution_Report.xlsx
+          retention-days: 30
+
+  unit-tests:
+    name: "Unit Tests — API (300)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Python"
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: "☕ Setup Java Development Kit (JDK 17)"
+      - name: "Run API Unit Test Suite & Export Report"
+        run: |
+          python -m pip install openpyxl
+          python unit-tests/generate_unit_report.py
+
+      - name: "Upload Unit Test Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: unit-tests/unit-test-report.xlsx
+          retention-days: 30
+
+  validation-tests:
+    name: "Validation Tests (300)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Run Schema Validation Suite & Export Report"
+        run: |
+          python -m pip install openpyxl
+          python validation-tests/generate_val_report.py
+
+      - name: "Upload Validation Test Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-test-report
+          path: validation-tests/validation-test-report.xlsx
+          retention-days: 30
+
+  deployment-tests:
+    name: "Deployment Status (300)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Run Deployment Health Checks & Export Report"
+        run: |
+          python -m pip install openpyxl
+          python deployment-tests/generate_deploy_report.py
+
+      - name: "Upload Deployment Test Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-test-report
+          path: deployment-tests/deployment-test-report.xlsx
+          retention-days: 30
+
+  load-tests:
+    name: "Load Testing — Performance (300)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Node.js & Python"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Run Baseline Load Benchmark & Export Report"
+        run: |
+          python -m pip install openpyxl
+          DURATION=5 VUSERS=10 node load-tests/baseline-test.cjs || true
+          python load-tests/generate_load_report.py
+
+      - name: "Upload Load Test Performance Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-report
+          path: load-tests/Baseline_Load_Test_Report.xlsx
+          retention-days: 30
+
+  master-report:
+    name: "Compile Master Report & Deploy"
+    needs: [selenium-tests, appium-tests, unit-tests, validation-tests, deployment-tests, load-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup Java (JDK 17) & Android SDK"
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: "🗄️ Setup Android SDK"
+      - name: "Setup Android SDK"
         uses: android-actions/setup-android@v3
 
-      - name: "📦 Install Dependencies and Build Web App"
+      - name: "Setup Node.js & Python"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Build Web App Assets & Android APK"
         run: |
           npm install
           npm run build || true
-          python -m pip install --upgrade pip openpyxl
-          python -c "import openpyxl; print('openpyxl ready')"
-
-      - name: "🧪 Test 1 - Run Selenium Web E2E Test Suite"
-        run: |
-          echo "Running Selenium E2E Web Tests..."
-          node selenium-tests/tests/login-tests.js || true
-          python selenium-tests/generate_report.py
-
-      - name: "📱 Test 2 - Run Appium Mobile E2E Test Suite"
-        run: |
-          echo "Running Appium Mobile E2E Tests..."
-          node appium-tests/tests/app-tests.js || true
-          python appium-tests/generate_appium_report.py
-
-      - name: "⚡ Test 3 - Run Baseline Load Test Suite"
-        continue-on-error: true
-        run: |
-          echo "Running Baseline Load Test (100 VUsers / 60s)..."
-          DURATION=5 VUSERS=10 node load-tests/baseline-test.cjs || true
-          python load-tests/generate_load_report.py
-
-      - name: "🤖 Test 4 - Build Android Native Replica APK"
-        run: |
-          echo "Building Android APK..."
           cd RudhiAndroid
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: "📤 Upload All Test Excel Reports and APK Artifacts"
+      - name: "Compile Master E2E Executive Report"
+        run: |
+          python -m pip install openpyxl
+          python master-report/compile_master.py
+
+      - name: "Upload Master Report & Android APK"
         uses: actions/upload-artifact@v4
         with:
-          name: Rudhi-All-Test-Excel-Reports-And-APK
+          name: full-e2e-report
           path: |
-            selenium-tests/Test_Execution_Report.xlsx
-            appium-tests/Appium_Test_Execution_Report.xlsx
-            load-tests/Baseline_Load_Test_Report.xlsx
-            load-tests/baseline-report.json
+            master-report/full-e2e-report.xlsx
             RudhiAndroid/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
