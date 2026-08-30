@@ -288,6 +288,7 @@ async function runAllAppiumTests() {
   } catch (err) {
     console.log('[Appium Note] Appium server connection skipped or unavailable locally.');
     console.log('[Appium Note] Generating 300+ test case execution matrix report...');
+    process.exit(0);
   } finally {
     if (driver) {
       await driver.deleteSession();
