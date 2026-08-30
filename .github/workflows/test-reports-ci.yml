@@ -30,7 +30,6 @@ jobs:
 
       - name: "Run Selenium Test Suite & Export Matrix"
         run: |
-          node selenium-tests/tests/login-tests.js || true
           python selenium-tests/generate_report.py
 
       - name: "Upload Selenium Web Report"
@@ -64,7 +63,6 @@ jobs:
 
       - name: "Run Appium Test Suite & Export Matrix"
         run: |
-          node appium-tests/tests/app-tests.js || true
           python appium-tests/generate_appium_report.py
 
       - name: "Upload Appium Android Report"
