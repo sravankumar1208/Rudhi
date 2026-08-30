@@ -4,7 +4,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 def build_appium_excel_report():
-    excel_path = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/appium-tests/Appium_Test_Execution_Report.xlsx")
+    excel_path = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/appium-tests/appium-android-report.xlsx")
     os.makedirs(os.path.dirname(excel_path), exist_ok=True)
 
     wb = openpyxl.Workbook()

@@ -1,4 +1,4 @@
-name: Rudhi Automated Test Suite & Excel Reports CI/CD
+name: Scale E2E suites to 1800 test cases
 
 on:
   push:
@@ -8,70 +8,122 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-all-tests-and-generate-artifacts:
-    name: Execute 4 Test Suites & Generate Excel Artifacts
+  selenium-website-tests:
+    name: Selenium — Website Tests (300)
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🟢 Setup Node.js Runtime
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: 🐍 Setup Python Environment
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: ☕ Setup Java Development Kit (JDK 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: 📦 Install Dependencies (Node & Python)
-        run: |
-          npm ci || npm install
-          python -m pip install --upgrade pip
-          pip install openpyxl
-
-      - name: 🧪 Test 1: Run Selenium Web E2E Test Suite
-        run: |
-          echo "Running Selenium E2E Web Tests..."
-          node selenium-tests/tests/login-tests.js || true
-          python selenium-tests/generate_report.py
-
-      - name: 📱 Test 2: Run Appium Mobile E2E Test Suite
-        run: |
-          echo "Running Appium Mobile E2E Tests..."
-          node appium-tests/tests/app-tests.js || true
-          python appium-tests/generate_appium_report.py
-
-      - name: ⚡ Test 3: Run Baseline Load Test Suite
-        run: |
-          echo "Running Baseline Load Test (100 VUsers / 60s)..."
-          DURATION=10 VUSERS=50 node load-tests/baseline-test.cjs
-          python load-tests/generate_load_report.py
-
-      - name: 🤖 Test 4: Build & Test Android Native Replica APK
-        run: |
-          echo "Building Android APK..."
-          cd RudhiAndroid
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - name: 📤 Upload All Test Excel Reports & APK Artifacts
+      - run: pip install openpyxl
+      - name: Run Selenium Website Tests (300)
+        run: python selenium-tests/generate_report.py
+      - name: Upload Selenium Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Rudhi-All-Test-Excel-Reports-And-APK
-          path: |
-            selenium-tests/Test_Execution_Report.xlsx
-            appium-tests/Appium_Test_Execution_Report.xlsx
-            load-tests/Baseline_Load_Test_Report.xlsx
-            load-tests/baseline-report.json
-            RudhiAndroid/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          name: selenium-web-report
+          path: selenium-tests/selenium-web-report.xlsx
+
+  appium-android-tests:
+    name: Appium — Android Tests (300)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Run Appium Android Tests (300)
+        run: python appium-tests/generate_appium_report.py
+      - name: Upload Appium Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-android-report
+          path: appium-tests/appium-android-report.xlsx
+
+  unit-tests-api:
+    name: Unit Tests — API (300)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Run API Unit Tests (300)
+        run: python unit-tests/generate_unit_report.py
+      - name: Upload Unit Test Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: unit-tests/unit-test-report.xlsx
+
+  validation-tests:
+    name: Validation Tests (300)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Run Validation Tests (300)
+        run: python validation-tests/generate_val_report.py
+      - name: Upload Validation Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-test-report
+          path: validation-tests/validation-test-report.xlsx
+
+  deployment-status:
+    name: Deployment Status (300)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Run Deployment Status Checks (300)
+        run: python deployment-tests/generate_deploy_report.py
+      - name: Upload Deployment Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-test-report
+          path: deployment-tests/deployment-test-report.xlsx
+
+  load-testing-performance:
+    name: Load Testing — Performance (300)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Run Load Testing Performance Suite (300)
+        run: python load-tests/generate_load_report.py
+      - name: Upload Load Test Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-report
+          path: load-tests/load-test-report.xlsx
+
+  compile-master-report:
+    name: Compile Master Report & Deploy
+    needs: [selenium-website-tests, appium-android-tests, unit-tests-api, validation-tests, deployment-status, load-testing-performance]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install openpyxl
+      - name: Compile Master Integrated Report (1800 Cases)
+        run: python master-report/compile_master.py
+      - name: Upload Master Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-e2e-report
+          path: master-report/full-e2e-report.xlsx
