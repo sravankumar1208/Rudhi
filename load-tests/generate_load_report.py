@@ -7,7 +7,7 @@ from openpyxl.utils import get_column_letter
 def build_load_test_excel_report():
     base_dir = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/load-tests")
     json_path = os.path.join(base_dir, "baseline-report.json")
-    excel_path = os.path.join(base_dir, "load-test-report.xlsx")
+    excel_path = os.path.join(base_dir, "Baseline_Load_Test_Report.xlsx")
 
     # Load JSON metrics if available, otherwise use benchmark values
     if os.path.exists(json_path):
