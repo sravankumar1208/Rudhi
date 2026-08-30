@@ -3,7 +3,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def build_master_e2e_report():
-    base_dir = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/master-report")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     os.makedirs(base_dir, exist_ok=True)
     excel_path = os.path.join(base_dir, "full-e2e-report.xlsx")
 

@@ -3,7 +3,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def build_deploy_test_excel():
-    base_dir = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/deployment-tests")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     os.makedirs(base_dir, exist_ok=True)
     excel_path = os.path.join(base_dir, "deployment-test-report.xlsx")
 

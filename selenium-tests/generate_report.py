@@ -4,7 +4,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 def build_excel_report():
-    excel_path = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/selenium-tests/Test_Execution_Report.xlsx")
+    excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Test_Execution_Report.xlsx")
     os.makedirs(os.path.dirname(excel_path), exist_ok=True)
 
     wb = openpyxl.Workbook()

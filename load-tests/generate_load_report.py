@@ -5,7 +5,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 def build_load_test_excel_report():
-    base_dir = os.path.abspath("c:/Users/Pooji/StudioProjects/Rudhi/load-tests")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     json_path = os.path.join(base_dir, "baseline-report.json")
     excel_path = os.path.join(base_dir, "Baseline_Load_Test_Report.xlsx")
 
