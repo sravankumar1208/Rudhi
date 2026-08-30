@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Rudhi</string>
+    <string name="title_home">Home</string>
+    <string name="title_find">Find</string>
+    <string name="title_alerts">Alerts</string>
+    <string name="title_profile">Profile</string>
+    <string name="request_blood">Request Blood</string>
+
+    <!-- Auth -->
+    <string name="sign_in">Sign In</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="welcome_back">Welcome Back</string>
+    <string name="create_account">Create Account</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="reset_password">Reset Password</string>
+    <string name="email_hint">you@example.com</string>
+    <string name="password_hint">Enter your password</string>
+    <string name="name_hint">John Doe</string>
+    <string name="role_donor">Donor</string>
+    <string name="role_patient">Patient</string>
+    <string name="role_hospital">Hospital</string>
+
+    <!-- Dashboard -->
+    <string name="status_available">Available to Donate</string>
+    <string name="status_unavailable">Unavailable</string>
+    <string name="lives_saved_banner">You\'ve saved %1$d lives</string>
+    <string name="urgent_requests">Urgent Requests Near You</string>
+    <string name="accept_request">Accept Request</string>
+    <string name="view_request">View</string>
+    <string name="nearby_donors">Nearby</string>
+    <string name="open_requests">Requests</string>
+    <string name="donations_completed">Donations</string>
+
+    <!-- Request Blood -->
+    <string name="fill_with_ai">Fill with AI ✨</string>
+    <string name="describe_need_prompt">E.g., Need 2 units of A+ blood urgently at Stanley Medical College</string>
+    <string name="generate_form">Generate Form</string>
+    <string name="patient_name">Patient Name</string>
+    <string name="blood_group">Required Blood Group</string>
+    <string name="units_needed">Units Needed</string>
+    <string name="urgency_level">Urgency Level</string>
+    <string name="destination_hospital">Destination Hospital</string>
+    <string name="pickup_point">Pickup / Meeting Point</string>
+    <string name="broadcast_radius">Broadcast Alert Radius</string>
+    <string name="sms_mode">Enable SMS Emergency Mode</string>
+    <string name="send_alert">Send Alert to Donors</string>
+
+    <!-- Donor Alert & Mission -->
+    <string name="urgent_need">URGENT NEED</string>
+    <string name="accept_and_navigate">Accept &amp; Navigate</string>
+    <string name="decline">Decline</string>
+    <string name="open_maps">Open Maps</string>
+    <string name="ive_arrived">I\'ve Arrived</string>
+    <string name="log_donation">Log Donation</string>
+
+    <!-- Certificate -->
+    <string name="certificate_of_appreciation">Certificate of Appreciation</string>
+    <string name="verified_by_grok">VERIFIED BY GROK AI</string>
+    <string name="share">Share</string>
+    <string name="save_pdf">Save PDF</string>
+</resources>

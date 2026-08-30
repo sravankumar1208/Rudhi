@@ -24,14 +24,23 @@ export const logDonation = async ({
       units_donated: unitsDonated,
       proof_url: proofUrl,
       feedback,
-      status: 'pending',
+      status: 'approved',
     })
     .select()
     .single()
 
   if (error) throw error
 
-
+  if (requestId) {
+    try {
+      await supabase
+        .from('blood_requests')
+        .update({ status: 'fulfilled' })
+        .eq('id', requestId)
+    } catch (e) {
+      console.warn('Could not update request status to fulfilled:', e)
+    }
+  }
 
   return data
 }

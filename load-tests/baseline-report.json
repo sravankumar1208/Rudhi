@@ -1,0 +1,19 @@
+{
+  "targetUrl": "https://rudhi.vercel.app",
+  "vusers": 10,
+  "durationSeconds": 5,
+  "actualDurationSeconds": 5.04,
+  "totalRequests": 1398,
+  "successRequests": 1398,
+  "failedRequests": 0,
+  "successRatePercent": 100,
+  "requestsPerSecond": 277.66,
+  "latencyMs": {
+    "min": 29,
+    "avg": 35,
+    "max": 242,
+    "p90": 38,
+    "p95": 46
+  },
+  "timestamp": "2026-08-30T09:44:53.568Z"
+}

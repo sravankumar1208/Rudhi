@@ -55,11 +55,12 @@ export const Home = () => {
           getNearbyRequests(),
           getMyDonations().catch(() => []),
         ])
-        setRequests(nearby.filter(r => r.status === 'searching' || r.status === 'matched'))
+        const activeList = nearby.filter(r => r.status !== 'fulfilled' && r.status !== 'cancelled')
+        setRequests(activeList)
         setDonationsCount(donations.length || 0)
         setStats({
           donorsNearby: 142,
-          activeRequests: nearby.length,
+          activeRequests: activeList.length,
         })
       } catch {
         // Use empty state on error
@@ -74,11 +75,7 @@ export const Home = () => {
     const channel = supabase
       .channel('home-requests-live')
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'blood_requests' },
-        () => load()
-      )
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'blood_requests' },
+        { event: '*', schema: 'public', table: 'blood_requests' },
         () => load()
       )
       .subscribe()

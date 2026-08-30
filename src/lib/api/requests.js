@@ -144,6 +144,18 @@ export const respondToRequest = async (requestId, response = 'accepted') => {
     .single()
 
   if (error) throw error
+
+  if (response === 'accepted') {
+    try {
+      await supabase
+        .from('blood_requests')
+        .update({ status: 'matched' })
+        .eq('id', requestId)
+    } catch (e) {
+      console.warn('Could not update request status to matched:', e)
+    }
+  }
+
   return data
 }
 
