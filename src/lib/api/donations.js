@@ -24,7 +24,7 @@ export const logDonation = async ({
       units_donated: unitsDonated,
       proof_url: proofUrl,
       feedback,
-      status: 'approved',
+      status: 'confirmed',
     })
     .select()
     .single()
